@@ -101,9 +101,16 @@ amplifier-bundle-zerovector/
 │   └── crew-content.md                        # /crew-content — writing
 ├── recipes/
 │   └── intent-to-artifact.yaml               # Staged pipeline (3 stages, 2 gates)
-└── context/
-    ├── zerovector-principles.md               # 7 ZVD principles + philosophy
-    └── crew-instructions.md                   # Orchestration rules + delegation contract
+├── context/
+│   ├── zerovector-principles.md               # 7 ZVD principles + philosophy
+│   └── crew-instructions.md                   # Orchestration rules + delegation contract
+└── research/
+    ├── 00-source-material.md                  # Original zerovector.design content extraction
+    ├── 01-philosophy-deep-dive.md             # Analysis of ZVD's 7 principles + thesis
+    ├── 02-amplifier-alignment.md              # ZVD ↔ Amplifier mapping + gap analysis
+    ├── 03-crew-design-rationale.md            # Why 6 crews, 5 agents, ~/dev survey
+    ├── 04-implementation-decisions.md         # Every structural choice with rationale
+    └── 05-roadmap.md                          # Phased roadmap through v1.0.0
 ```
 
 ## Smoke Tests
@@ -112,11 +119,16 @@ Verify the bundle is correctly assembled.
 
 ### 1. File tree check
 
-Confirm all 16 content files are present (5 agents + 6 modes + 1 behavior + 1 recipe + 2 context + 1 bundle.md):
+Run from the bundle root (`cd` into the repo first):
 
 ```bash
-find ~/dev/amplifier-bundle-zerovector -type f ! -name '.gitignore' ! -name 'README.md' ! -path '*/.git/*' | wc -l
-# Expected: 16
+# Runtime files only (agents, modes, behavior, recipe, context, bundle.md)
+find . -type f ! -name '.gitignore' ! -name 'README.md' ! -path '*/.git/*' ! -path './research/*' | wc -l
+# Expected: 16  (5 agents + 6 modes + 1 behavior + 1 recipe + 2 context + 1 bundle.md)
+
+# Total content files (runtime + research docs)
+find . -type f ! -name '.gitignore' ! -path '*/.git/*' | wc -l
+# Expected: 23  (16 runtime + 1 README + 6 research)
 ```
 
 ### 2. Mode shortcuts
@@ -124,7 +136,7 @@ find ~/dev/amplifier-bundle-zerovector -type f ! -name '.gitignore' ! -name 'REA
 Verify all six crew commands are registered:
 
 ```bash
-grep -r 'shortcut:' ~/dev/amplifier-bundle-zerovector/modes/
+grep -r 'shortcut:' modes/
 # Expected output (6 lines):
 #   crew.md:  shortcut: crew
 #   crew-build.md:  shortcut: crew-build
@@ -139,7 +151,7 @@ grep -r 'shortcut:' ~/dev/amplifier-bundle-zerovector/modes/
 Confirm all five agents are referenced in the behavior:
 
 ```bash
-grep 'zerovector:' ~/dev/amplifier-bundle-zerovector/behaviors/zerovector-methodology.yaml
+grep 'zerovector:' behaviors/zerovector-methodology.yaml
 # Expected: intent-analyst, architect, builder, critic, shipper
 ```
 
@@ -157,7 +169,7 @@ recipes(operation="validate", recipe_path="zerovector:recipes/intent-to-artifact
 Confirm bundle.md declares the correct name and includes foundation:
 
 ```bash
-head -10 ~/dev/amplifier-bundle-zerovector/bundle.md
+head -10 bundle.md
 # Expected: name: zerovector, includes amplifier-foundation
 ```
 
