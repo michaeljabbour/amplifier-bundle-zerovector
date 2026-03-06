@@ -1,0 +1,63 @@
+bundle:
+  name: zerovector-methodology-behavior
+  version: 0.1.0
+  description: |
+    Zero-Vector Design methodology — intent-to-artifact pipeline with a five-role crew
+    and domain-tuned slash commands.
+
+    Provides 5 agents:
+    - intent-analyst: Decodes intent, surfaces constraints, defines success criteria
+    - architect: Translates intent into structure, spec, and implementation plan
+    - builder: Implements the artifact from the architect's spec
+    - critic: Validates artifact fidelity against original intent
+    - shipper: Packages, commits, documents, and delivers the finished artifact
+
+    Provides 6 interactive modes:
+    - crew: General intent-to-artifact (any domain)
+    - crew-build: Feature/app/tool/script construction
+    - crew-product: UX, flows, specs, validation, product strategy
+    - crew-platform: Infrastructure, modules, APIs, architecture
+    - crew-research: Papers, analysis, investigation, synthesis
+    - crew-content: Writing, documentation, curriculum, posts
+
+    Core principles (Zero-Vector Design):
+    - Intent → Artifact directly (no lossy translation chain)
+    - Agents as crew, not assistants (each has a precise role)
+    - Work in the medium (build the thing, not a picture of the thing)
+    - Boundaryless by nature (disciplinary walls are optional)
+    - Compound leverage (each pipeline stage amplifies the last)
+
+    Compose onto your bundle for Zero-Vector workflows.
+
+# Explicit dependency on the modes behavior for namespace resolution
+includes:
+  - bundle: git+https://github.com/microsoft/amplifier-bundle-modes@main#subdirectory=behaviors/modes.yaml
+
+# Mode hook to discover zerovector modes (crew, crew-build, crew-product, crew-platform, crew-research, crew-content)
+hooks:
+  - module: hooks-mode
+    source: git+https://github.com/microsoft/amplifier-bundle-modes@main#subdirectory=modules/hooks-mode
+    config:
+      search_paths:
+        - "@zerovector:modes"
+
+# Mode tool for programmatic mode transitions
+tools:
+  - module: tool-mode
+    source: git+https://github.com/microsoft/amplifier-bundle-modes@main#subdirectory=modules/tool-mode
+    config:
+      gate_policy: "warn"
+
+agents:
+  include:
+    - zerovector:intent-analyst
+    - zerovector:architect
+    - zerovector:builder
+    - zerovector:critic
+    - zerovector:shipper
+
+context:
+  include:
+    - zerovector:context/zerovector-principles.md
+    - zerovector:context/crew-instructions.md
+    - modes:context/modes-instructions.md
