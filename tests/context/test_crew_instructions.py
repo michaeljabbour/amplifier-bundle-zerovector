@@ -61,14 +61,10 @@ class TestOldTerminologyRemoved:
         assert "GATE 2" not in crew_content
         assert "GATE 3" not in crew_content
 
-    def test_no_numbered_stages(self, crew_content: str):
+    @pytest.mark.parametrize("n", range(1, 7))
+    def test_no_numbered_stages(self, crew_content: str, n: int):
         # Should not have "Stage 1 →", "Stage 2 →" etc as section headers
-        assert "Stage 1" not in crew_content
-        assert "Stage 2" not in crew_content
-        assert "Stage 3" not in crew_content
-        assert "Stage 4" not in crew_content
-        assert "Stage 5" not in crew_content
-        assert "Stage 6" not in crew_content
+        assert f"Stage {n}" not in crew_content
 
     def test_no_pipeline_depth_calibration(self, crew_content: str):
         assert "Pipeline Depth Calibration" not in crew_content
