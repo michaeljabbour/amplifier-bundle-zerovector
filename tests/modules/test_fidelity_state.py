@@ -55,7 +55,7 @@ def _content(result):
     """Extract content string from ToolResult or plain dict."""
     if isinstance(result, dict):
         return result.get("content", "")
-    # Real ToolResult uses 'output' for success content
+    # ToolResult.output may be None when no output was set; fall back to ""
     return getattr(result, "output", "") or ""
 
 
