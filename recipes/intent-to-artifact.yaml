@@ -224,9 +224,8 @@ stages:
 
       - id: "refinement-loop"
         while_condition: "{{verdict_status.needs_revision}}"
-        break_when: "not {{verdict_status.needs_revision}}"
-        max_iterations: 3
-        steps:
+        max_while_iterations: 3
+        while_steps:
           - id: "refine-build"
             agent: "zerovector:builder"
             prompt: |
