@@ -173,7 +173,7 @@ Different domains have different convergence targets. A research synthesis does 
 
 After completing a fidelity assessment, persist the result using the `update_fidelity` tool:
 
-```
+```js
 update_fidelity({
   "domain": "build",
   "target": 0.85,
