@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
+
+_log = logging.getLogger(__name__)
 
 # Guard import for ToolResult -- fall back to plain dict when amplifier_core
 # is not installed (e.g. in isolated test environments).
@@ -171,19 +174,23 @@ async def mount(coordinator, config: dict | None = None) -> dict[str, str]:
     try:
         coordinator.mount("tools", tool, name=tool.name)
     except Exception:
-        pass
+        _log.debug("Failed to mount update_fidelity tool", exc_info=True)
 
     try:
         coordinator.register_capability("zerovector.fidelity_state", state)
     except Exception:
-        pass
+        _log.debug(
+            "Failed to register zerovector.fidelity_state capability", exc_info=True
+        )
 
     try:
         coordinator.register_capability(
             "zerovector.update_fidelity", state.update_fidelity
         )
     except Exception:
-        pass
+        _log.debug(
+            "Failed to register zerovector.update_fidelity capability", exc_info=True
+        )
 
     return {
         "name": "tool-fidelity-state",

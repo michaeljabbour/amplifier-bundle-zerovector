@@ -1,5 +1,6 @@
 """Tests for tool-fidelity-state module."""
 
+import logging
 import os
 import sys
 
@@ -270,3 +271,10 @@ class TestMount:
     async def test_mount_tolerates_coordinator_errors(self):
         info = await mount(ErrorCoordinator())
         assert info["name"] == "tool-fidelity-state"
+
+    @pytest.mark.asyncio
+    async def test_mount_logs_coordinator_errors(self, caplog):
+        with caplog.at_level(logging.DEBUG):
+            await mount(ErrorCoordinator())
+        assert len(caplog.records) == 3
+        assert all(r.levelno == logging.DEBUG for r in caplog.records)
