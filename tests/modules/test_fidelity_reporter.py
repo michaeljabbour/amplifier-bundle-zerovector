@@ -192,8 +192,8 @@ class TestRenderEphemeral:
     def test_contains_overall_score(self):
         reporter = FidelityReporter()
         result = reporter.render_ephemeral(FULL_STATE)
-        # 0.538 → appears as 0.54 or 0.53
-        assert "0.5" in result
+        # 0.538 → f"{0.538:.2f}" deterministically produces "0.54"
+        assert "0.54" in result
 
     def test_contains_target(self):
         reporter = FidelityReporter()

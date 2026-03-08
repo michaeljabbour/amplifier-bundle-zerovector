@@ -28,7 +28,7 @@ try:
 except ImportError:  # pragma: no cover
     from dataclasses import dataclass
 
-    @dataclass
+    @dataclass(frozen=True)
     class HookResult:  # type: ignore[no-redef]
         """Minimal HookResult fallback for standalone/test environments."""
 
