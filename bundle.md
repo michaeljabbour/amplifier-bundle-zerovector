@@ -1,12 +1,12 @@
 ---
 bundle:
   name: zerovector
-  version: 0.2.0
-  description: Zero-Vector Design — intent-to-artifact pipeline eliminating translation loss between vision and product
+  version: 0.3.0
+  description: Zero-Vector Design — fidelity convergence architecture eliminating translation loss between vision and product
 
 includes:
   - bundle: git+https://github.com/microsoft/amplifier-foundation@main
-  - bundle: zerovector:behaviors/zerovector-methodology
+  - bundle: zerovector:behaviors/zerovector-crew
 ---
 
 # Zero-Vector Design
@@ -55,28 +55,50 @@ Invoke any crew with a slash command. Each crew is tuned for a specific work dom
 | Critic | `zerovector:critic` | Validate artifact against original intent |
 | Shipper | `zerovector:shipper` | Package, commit, document, deliver |
 
-## v0.2 Handoff Architecture
+## v0.3 Fidelity Convergence Architecture
+
+Instead of a linear pipeline of sequential stages, ZeroVector v0.3 uses a **fidelity convergence
+model**: five concurrent lenses are assessed simultaneously, and the crew routes to whichever lens
+is weakest until the overall fidelity score reaches the target threshold.
+
+### The Five Fidelity Lenses
+
+| Lens | What It Measures |
+|------|-----------------|
+| **Intent Clarity** | Is the original intent fully understood and unambiguous? |
+| **Specification** | Does the spec completely and correctly capture the intent? |
+| **Implementation** | Does the artifact faithfully implement the spec? |
+| **Quality** | Does the artifact meet quality standards (tests, style, correctness)? |
+| **Ship-Readiness** | Is the artifact packaged and deliverable? |
+
+### The Convergence Loop
 
 ```
-DECODE → (GATE 1: approve spec) → BUILD+REVIEW → convergence loop (max 3)
-       → (GATE 2: approve artifact) → VERIFY → (GATE 3: choose finish action)
-       → FINISH (merge / pr / keep / discard)
+DECODE-INTENT → (GATE 1: approve spec)
+  → ASSESS all five lenses simultaneously (fidelity score 0.0–1.0)
+  → while fidelity_score < target_fidelity (default 0.85):
+      route to weakest lens → act → re-assess
+  → (GATE 2: approve converged artifact)
+  → FINISH (merge / pr / keep / discard)
 ```
 
-The critic runs two passes on every review (spec compliance + quality) and emits a
-machine-readable `VERDICT: PASS|CONDITIONAL_PASS|FAIL` for recipe loop integration.
-The convergence loop retries builder↔critic up to 3 rounds before surfacing unresolved issues.
+Each assessment produces a machine-readable fidelity score. The loop terminates when the score
+meets the target or after a maximum of 8 iterations.
+
+### Universal Fidelity Diagnostic Layer
+
+The fidelity behavior (`zerovector:behaviors/fidelity`) is an **extractable, standalone layer**
+that can be included by any Amplifier bundle — not just ZeroVector. It wires the
+`zerovector:critic` agent, the `tool-fidelity-state` tool, and the `hooks-fidelity-reporter`
+hook into any session that needs structured fidelity scoring.
 
 ## Available Recipes
 
-Run the full pipeline or any sub-recipe independently:
-
 | Recipe | Purpose | Gates |
 |--------|---------|-------|
-| `zerovector:recipes/intent-to-artifact.yaml` | **Master orchestrator** — full pipeline | 3 |
+| `zerovector:recipes/intent-to-artifact.yaml` | **Master orchestrator** — fidelity convergence pipeline | 2 |
+| `zerovector:recipes/fidelity-convergence.yaml` | **Core convergence engine** — assess → route → act loop | 0 |
 | `zerovector:recipes/decode-intent.yaml` | Intent capture + spec only | 1 |
-| `zerovector:recipes/build-and-review.yaml` | Spec + build + critic convergence loop | 2 |
-| `zerovector:recipes/verify-artifact.yaml` | Evidence-first verification pass | 1 |
 | `zerovector:recipes/finish-artifact.yaml` | Finish action: merge / pr / keep / discard | 1 |
 
 ---
