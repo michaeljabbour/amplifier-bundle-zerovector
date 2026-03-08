@@ -1,0 +1,239 @@
+# Zero-Vector Fidelity Convergence Engine — Core while-loop convergence (v0.3)
+# Replaces the linear pipeline (discover→specify→build→review→ship) with a
+# multi-lens fidelity convergence loop.
+#
+# Architecture:
+#   1. Decode raw intent into an Intent Document (establish-intent)
+#   2. Assess all 5 fidelity lenses → structured JSON score (initial-assessment)
+#   3. Extract overall fidelity score into context (extract-score)
+#   4. WHILE score < target: route to weakest lens agent → re-assess (convergence-loop)
+#   5. Emit final convergence summary (convergence-summary)
+#
+# Fidelity Lenses (assessed by zerovector:critic):
+#   intent_clarity    → zerovector:intent-analyst
+#   specification     → zerovector:architect
+#   implementation    → zerovector:builder
+#   quality           → zerovector:critic
+#   ship_readiness    → zerovector:shipper
+#
+# Usage:
+#   amplifier run "execute zerovector:recipes/fidelity-convergence.yaml
+#                  with intent='my intent' domain='build' target_fidelity='0.85'"
+
+name: "fidelity-convergence"
+description: "Zero-Vector fidelity convergence engine: multi-lens while-loop drives all 5 lenses to target fidelity"
+version: "0.3.0"
+author: "Zero-Vector Bundle"
+tags: ["workflow", "zero-vector", "fidelity", "convergence", "v0.3", "core"]
+
+context:
+  intent: ""              # Required: raw human intent
+  domain: "general"       # build | product | platform | research | content | general
+  target_fidelity: "0.85" # Convergence threshold (0.0–1.0); loop exits when reached
+  fidelity_score: "0"     # Current overall fidelity score; updated each loop iteration
+  project_path: "."       # Project directory (defaults to current)
+  intent_document: ""     # Populated by establish-intent; passed through all steps
+  specification: ""       # Populated by convergence loop when specification lens is weak
+
+steps:
+  # ==========================================================================
+  # STEP 1: ESTABLISH INTENT
+  # Decodes raw intent into a structured Intent Document for all downstream steps
+  # ==========================================================================
+  - id: "establish-intent"
+    agent: "zerovector:intent-analyst"
+    prompt: |
+      Decode this intent and produce a complete Intent Document.
+
+      Raw Intent: {{intent}}
+      Domain: {{domain}}
+      Project path: {{project_path}}
+
+      Produce a structured Intent Document covering:
+      - The Job (one sentence: what is this artifact hired to do?)
+      - Outcome Definition (measurable success — what does "done" look like?)
+      - Scope (IN: what is included / OUT: what is explicitly excluded)
+      - Constraints (tech, time, existing systems, non-negotiables)
+      - Assumptions Made (state each assumption and why you made it)
+      - Anti-Goals (what this is NOT — restate clearly for the Builder)
+      - Risk Flags (what could go wrong if intent is misunderstood?)
+
+      Survey the project at {{project_path}} before producing the document.
+      Do not ask questions — make the best interpretation and document it.
+    output: "intent_document"
+
+  # ==========================================================================
+  # STEP 2: INITIAL ASSESSMENT
+  # Multi-lens fidelity assessment producing a structured JSON score object
+  # ==========================================================================
+  - id: "initial-assessment"
+    agent: "zerovector:critic"
+    prompt: |
+      Perform a multi-lens fidelity assessment of the current state.
+
+      Assess each of the 5 fidelity lenses on a 0.0–1.0 scale:
+
+      1. intent_clarity   — Is the intent fully decoded, unambiguous, and actionable?
+      2. specification    — Does a complete, implementation-ready spec exist?
+      3. implementation   — Does working, tested code/artifact exist that meets the spec?
+      4. quality          — Does the artifact meet quality, robustness, and edge-case standards?
+      5. ship_readiness   — Is the artifact ready to ship (docs, tests, clean history, deployment)?
+
+      For each lens, provide:
+        - score: 0.0–1.0
+        - gap: one-sentence description of what is missing (or "none" if score >= 0.85)
+        - priority: true if this is the weakest lens (exactly one lens gets priority: true)
+
+      Intent Document:
+      {{intent_document}}
+
+      Specification (may be empty):
+      {{specification}}
+
+      Domain: {{domain}}
+      Project path: {{project_path}}
+
+      Respond ONLY with valid JSON matching this schema:
+      {
+        "intent_clarity":  {"score": 0.0, "gap": "...", "priority": false},
+        "specification":   {"score": 0.0, "gap": "...", "priority": false},
+        "implementation":  {"score": 0.0, "gap": "...", "priority": false},
+        "quality":         {"score": 0.0, "gap": "...", "priority": false},
+        "ship_readiness":  {"score": 0.0, "gap": "...", "priority": false},
+        "overall":         0.0,
+        "priority_gap":    "lens_name"
+      }
+    parse_json: true
+    output: "assessment"
+
+  # ==========================================================================
+  # STEP 3: EXTRACT SCORE
+  # Pulls the overall fidelity score out of the assessment JSON into context
+  # ==========================================================================
+  - id: "extract-score"
+    type: "bash"
+    command: |
+      SCORE=$(echo '{{assessment}}' | python3 -c "
+      import json, sys
+      data = json.load(sys.stdin)
+      print(data.get('overall', 0))
+      " 2>/dev/null || echo "0")
+      echo "{\"fidelity_score\": \"$SCORE\"}"
+    parse_json: true
+    output: "score_result"
+
+  # ==========================================================================
+  # STEP 4: CONVERGENCE LOOP
+  # Routes to the agent serving the weakest fidelity lens, re-assesses, repeats
+  # until overall fidelity >= target_fidelity or max_while_iterations is reached
+  # ==========================================================================
+  - id: "convergence-loop"
+    while_condition: "{{fidelity_score}} < {{target_fidelity}}"
+    max_while_iterations: 8
+    break_when: "{{fidelity_score}} >= {{target_fidelity}}"
+    update_context:
+      fidelity_score: "{{assessment.overall}}"
+    while_steps:
+      # -----------------------------------------------------------------------
+      # Route to the weakest lens agent and close the gap
+      # -----------------------------------------------------------------------
+      - id: "route-to-gap"
+        agent: "self"
+        prompt: |
+          The multi-lens fidelity assessment identified the following priority gap:
+
+          Priority gap lens: {{assessment.priority_gap}}
+          Current fidelity score: {{fidelity_score}} / {{target_fidelity}} target
+
+          Full assessment:
+          {{assessment}}
+
+          Intent Document:
+          {{intent_document}}
+
+          Specification (may be empty):
+          {{specification}}
+
+          Domain: {{domain}}
+          Project path: {{project_path}}
+
+          Delegate to the agent responsible for closing the priority gap lens:
+            - intent_clarity  → zerovector:intent-analyst  (refine the Intent Document)
+            - specification   → zerovector:architect       (produce or refine the Specification)
+            - implementation  → zerovector:builder         (implement or fix the artifact)
+            - quality         → zerovector:critic          (run quality pass and address issues)
+            - ship_readiness  → zerovector:shipper         (prepare artifact for delivery)
+
+          Instruct the chosen agent to address the gap described in the assessment
+          and return the updated artifact or document.
+        output: "gap_closure_result"
+        on_error: "continue"
+
+      # -----------------------------------------------------------------------
+      # Re-assess all 5 lenses after gap closure
+      # -----------------------------------------------------------------------
+      - id: "re-assess"
+        agent: "zerovector:critic"
+        prompt: |
+          Re-assess all 5 fidelity lenses after the gap closure action.
+
+          Previous assessment:
+          {{assessment}}
+
+          Gap closure result:
+          {{gap_closure_result}}
+
+          Intent Document:
+          {{intent_document}}
+
+          Specification (may be empty):
+          {{specification}}
+
+          Domain: {{domain}}
+          Project path: {{project_path}}
+
+          Assess each lens on a 0.0–1.0 scale.
+          Respond ONLY with valid JSON matching this schema:
+          {
+            "intent_clarity":  {"score": 0.0, "gap": "...", "priority": false},
+            "specification":   {"score": 0.0, "gap": "...", "priority": false},
+            "implementation":  {"score": 0.0, "gap": "...", "priority": false},
+            "quality":         {"score": 0.0, "gap": "...", "priority": false},
+            "ship_readiness":  {"score": 0.0, "gap": "...", "priority": false},
+            "overall":         0.0,
+            "priority_gap":    "lens_name"
+          }
+        parse_json: true
+        output: "assessment"
+
+  # ==========================================================================
+  # STEP 5: CONVERGENCE SUMMARY
+  # Emits a human-readable summary of the convergence result
+  # ==========================================================================
+  - id: "convergence-summary"
+    type: "bash"
+    command: |
+      echo "============================================"
+      echo "  ZERO-VECTOR FIDELITY CONVERGENCE RESULT"
+      echo "============================================"
+      echo ""
+      echo "Intent:          {{intent}}"
+      echo "Domain:          {{domain}}"
+      echo "Target fidelity: {{target_fidelity}}"
+      echo "Final score:     {{fidelity_score}}"
+      echo ""
+      echo "Lens scores (final assessment):"
+      echo "  intent_clarity:  {{assessment.intent_clarity.score}}"
+      echo "  specification:   {{assessment.specification.score}}"
+      echo "  implementation:  {{assessment.implementation.score}}"
+      echo "  quality:         {{assessment.quality.score}}"
+      echo "  ship_readiness:  {{assessment.ship_readiness.score}}"
+      echo ""
+      if [ "$(echo "{{fidelity_score}} >= {{target_fidelity}}" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
+        echo "STATUS: CONVERGED — target fidelity reached"
+      else
+        echo "STATUS: LOOP EXHAUSTED — manual review required (score: {{fidelity_score}})"
+      fi
+      echo ""
+      echo "============================================"
+    output: "convergence_report"
