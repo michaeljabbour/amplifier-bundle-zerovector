@@ -9,6 +9,20 @@ NEW: Intent → Crew → Artifact
 
 Built on [Zero-Vector Design](https://zerovector.design/) by Erika Flowers. Implemented as a thin Amplifier bundle: five specialized agents, six crew modes, six recipes, and a fidelity convergence engine. **v0.3.0**
 
+## Installation
+
+Add zerovector as an app bundle so it's automatically composed into every session:
+
+```bash
+amplifier bundle add git+https://github.com/michaeljabbour/amplifier-bundle-zerovector@main --app
+```
+
+Or to use a local development copy:
+
+```bash
+amplifier bundle add /path/to/amplifier-bundle-zerovector --app
+```
+
 ## Quick Start
 
 ### Interactive (crew modes)
