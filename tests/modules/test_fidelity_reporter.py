@@ -133,8 +133,8 @@ class TestRenderDashboard:
     def test_contains_overall_and_target(self):
         reporter = FidelityReporter()
         plain = _strip_ansi(reporter.render_dashboard(FULL_STATE))
-        # overall ~0.538 should appear as 0.54
-        assert "0.54" in plain or "0.53" in plain or "0.538" in plain
+        # overall ~0.538 -> f"{0.538:.2f}" deterministically produces "0.54"
+        assert "0.54" in plain
         assert "0.85" in plain
 
     def test_contains_domain(self):
