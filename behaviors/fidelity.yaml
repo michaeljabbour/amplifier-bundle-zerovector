@@ -36,4 +36,5 @@ agents:
 
 context:
   include:
+    - zerovector:context/using-zerovector.md
     - zerovector:context/fidelity-framework.md

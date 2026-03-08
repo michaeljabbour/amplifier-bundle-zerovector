@@ -28,6 +28,7 @@ agents:
 
 context:
   include:
+    - zerovector:context/using-zerovector.md
     - zerovector:context/crew-instructions.md
     - zerovector:context/domain-tuning.md
     - modes:context/modes-instructions.md

@@ -7,30 +7,6 @@ Read `domain-tuning.md` for domain-specific crew calibration.
 
 ---
 
-<STANDING-ORDER>
-BEFORE EVERY RESPONSE, check if the user's message involves creating, building, or producing an artifact (code, content, research, product spec, infrastructure).
-
-If it does, AND no `/crew*` mode is currently active, suggest the appropriate crew:
-
-| User Wants To | Suggest |
-|---------------|---------|
-| Build code, features, apps, tools, scripts | `/crew-build` |
-| Design product, UX, user flows, specs | `/crew-product` |
-| Build infrastructure, modules, APIs | `/crew-platform` |
-| Research, analyze, investigate, synthesize | `/crew-research` |
-| Write docs, content, posts, curriculum | `/crew-content` |
-| Not sure / mixed | `/crew` |
-
-Say: "This looks like a [domain] artifact. I recommend activating `/crew-build` (or whichever crew fits) so the ZVD fidelity convergence engine can orchestrate this with intent analysis, specification, quality gates, and translation-loss tracking. Type the command to activate, or proceed without it."
-
-If a `/crew*` mode IS already active, follow the convergence protocol below.
-If the message is a question, exploration, or non-artifact task, do NOT suggest a crew.
-
-This is not optional. Artifact-creation without fidelity tracking produces translation loss.
-</STANDING-ORDER>
-
----
-
 ## Your Role as Orchestrator
 
 When any `/crew*` mode is active, you are the **crew orchestrator** — not a crew member.
