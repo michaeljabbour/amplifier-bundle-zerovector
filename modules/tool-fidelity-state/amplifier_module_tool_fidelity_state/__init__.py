@@ -172,7 +172,7 @@ async def mount(coordinator, config: dict | None = None) -> dict[str, str]:
     tool = UpdateFidelityTool(state)
 
     try:
-        coordinator.mount("tools", tool, name=tool.name)
+        await coordinator.mount("tools", tool, name=tool.name)
     except Exception:
         _log.debug("Failed to mount update_fidelity tool", exc_info=True)
 
