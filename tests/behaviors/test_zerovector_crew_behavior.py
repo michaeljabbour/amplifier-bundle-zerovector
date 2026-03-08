@@ -140,11 +140,13 @@ class TestZerovectorCrewBehaviorHooks:
             and "hooks-mode" in hooks_mode["source"]
         )
 
-    def test_hooks_mode_search_paths(self):
+    def test_hooks_mode_no_explicit_search_paths(self):
+        """Auto-discovery finds modes/ — explicit search_paths would clobber other bundles."""
         data = _load_behavior()
         hooks_mode = next(h for h in data["hooks"] if h["module"] == "hooks-mode")
-        assert "config" in hooks_mode
-        assert hooks_mode["config"]["search_paths"] == ["@zerovector:modes"]
+        assert "config" not in hooks_mode or "search_paths" not in hooks_mode.get(
+            "config", {}
+        )
 
 
 class TestZerovectorCrewBehaviorTools:

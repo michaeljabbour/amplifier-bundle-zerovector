@@ -12,8 +12,6 @@ includes:
 hooks:
   - module: hooks-mode
     source: git+https://github.com/microsoft/amplifier-bundle-modes@main#subdirectory=modules/hooks-mode
-    config:
-      search_paths: ["@zerovector:modes"]
 
 tools:
   - module: tool-mode

@@ -259,9 +259,9 @@ This line is parsed by the recipe engine. It must be on its own line, no trailin
 
 ### 6. Update Fidelity State
 
-After producing the validation report, you MUST call the `update_fidelity` tool to push your
-fidelity scores into session state. This enables convergence tracking across pipeline stages
-and surfaces the fidelity dashboard.
+After completing both passes and producing the validation report, call `update_fidelity`
+**exactly once** to push your fidelity scores into session state. This enables convergence
+tracking across pipeline stages and surfaces the fidelity dashboard.
 
 ```js
 update_fidelity({
@@ -277,7 +277,9 @@ update_fidelity({
 })
 ```
 
-Never skip this step. The fidelity state must be persisted after every assessment.
+Call this tool **once per validation run** — after the report is written and the VERDICT line
+is determined. Do not call it during Pass 1, during Pass 2, or multiple times in a single
+invocation. One call, at the end, with the final scores. Then stop.
 
 ---
 
