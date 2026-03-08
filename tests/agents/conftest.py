@@ -13,11 +13,9 @@ AGENTS_DIR = Path(__file__).resolve().parents[2] / "agents"
 def _load_raw(path: Path) -> tuple[str, str]:
     """Read an agent markdown file once, returning (frontmatter_yaml, body)."""
     text = path.read_text()
-    fm_match = re.match(r"^---\n(.*?\n)---", text, re.DOTALL)
-    assert fm_match, f"{path.name} must have YAML frontmatter delimited by ---"
-    body_match = re.match(r"^---\n.*?\n---\n?(.*)", text, re.DOTALL)
-    assert body_match, f"{path.name} must have a body after frontmatter"
-    return fm_match.group(1), body_match.group(1)
+    m = re.match(r"^---\n(.*?\n)---\n?(.*)", text, re.DOTALL)
+    assert m, f"{path.name} must have YAML frontmatter delimited by ---"
+    return m.group(1), m.group(2)
 
 
 def load_agent_frontmatter(path: Path) -> dict[str, Any]:
