@@ -126,12 +126,12 @@ class TestBuildConvergenceLoop:
 class TestBuildLensesAndAgents:
     """All five agents must be referenced."""
 
-    def test_all_five_agents_referenced(self, crew_build_lower: str):
-        assert "intent-analyst" in crew_build_lower
-        assert "architect" in crew_build_lower
-        assert "builder" in crew_build_lower
-        assert "critic" in crew_build_lower
-        assert "shipper" in crew_build_lower
+    @pytest.mark.parametrize(
+        "agent",
+        ["intent-analyst", "architect", "builder", "critic", "shipper"],
+    )
+    def test_agent_referenced(self, crew_build_lower: str, agent: str):
+        assert agent in crew_build_lower, f"Missing agent reference: {agent}"
 
 
 class TestBuildOrchestratorRole:
@@ -291,12 +291,12 @@ class TestProductConvergenceLoop:
 class TestProductLensesAndAgents:
     """All five agents must be referenced."""
 
-    def test_all_five_agents_referenced(self, crew_product_lower: str):
-        assert "intent-analyst" in crew_product_lower
-        assert "architect" in crew_product_lower
-        assert "builder" in crew_product_lower
-        assert "critic" in crew_product_lower
-        assert "shipper" in crew_product_lower
+    @pytest.mark.parametrize(
+        "agent",
+        ["intent-analyst", "architect", "builder", "critic", "shipper"],
+    )
+    def test_agent_referenced(self, crew_product_lower: str, agent: str):
+        assert agent in crew_product_lower, f"Missing agent reference: {agent}"
 
 
 class TestProductOrchestratorRole:
