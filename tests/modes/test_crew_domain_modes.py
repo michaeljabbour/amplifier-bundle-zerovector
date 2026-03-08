@@ -1,9 +1,9 @@
 """Tests for domain crew modes — fidelity convergence rewrite.
 
-Validates that crew-build.md, crew-product.md, crew-platform.md, and
-crew-research.md have been rewritten from the v0.2 linear pipeline model
-(Stage 1-5) to the v0.3 fidelity convergence model, aligning with the
-already-rewritten crew.md and crew-instructions.md.
+Validates that crew-build.md, crew-product.md, crew-platform.md,
+crew-research.md, and crew-content.md have been rewritten from the v0.2
+linear pipeline model (Stage 1-5) to the v0.3 fidelity convergence model,
+aligning with the already-rewritten crew.md and crew-instructions.md.
 
 Each domain mode must:
 - Preserve YAML frontmatter and domain identity
@@ -72,6 +72,16 @@ def crew_research_content() -> str:
 @pytest.fixture(scope="module")
 def crew_research_lower(crew_research_content: str) -> str:
     return crew_research_content.lower()
+
+
+@pytest.fixture(scope="module")
+def crew_content_content() -> str:
+    return _load_crew_mode("content")
+
+
+@pytest.fixture(scope="module")
+def crew_content_lower(crew_content_content: str) -> str:
+    return crew_content_content.lower()
 
 
 # ===================================================================
@@ -765,3 +775,175 @@ class TestResearchDomainTuningReference:
 
     def test_domain_tuning_reference(self, crew_research_content: str):
         assert "domain-tuning.md" in crew_research_content
+
+
+# ===================================================================
+# CREW-CONTENT TESTS
+# ===================================================================
+
+
+class TestContentYamlFrontmatter:
+    """YAML frontmatter must be preserved — mode name, tools, etc."""
+
+    def test_has_yaml_frontmatter(self, crew_content_content: str):
+        assert crew_content_content.startswith("---")
+
+    def test_mode_name_is_crew_content(self, crew_content_content: str):
+        assert "name: crew-content" in crew_content_content
+
+    def test_delegate_tool_present(self, crew_content_content: str):
+        assert "delegate" in crew_content_content
+
+    def test_recipes_tool_present(self, crew_content_content: str):
+        assert "recipes" in crew_content_content
+
+
+class TestContentOldPipelineRemoved:
+    """The rewrite must remove linear pipeline stage terminology."""
+
+    @pytest.mark.parametrize("n", range(1, 6))
+    def test_no_numbered_stages(self, crew_content_content: str, n: int):
+        """Should not have 'Stage 1:', 'Stage 2:', etc. as section headers."""
+        assert f"Stage {n}" not in crew_content_content
+
+    def test_no_pipeline_keyword_in_critical(self, crew_content_content: str):
+        """The CRITICAL section should not describe a 'pipeline'."""
+        assert "<CRITICAL>" in crew_content_content
+        assert "</CRITICAL>" in crew_content_content
+        start = crew_content_content.index("<CRITICAL>")
+        end = crew_content_content.index("</CRITICAL>") + len("</CRITICAL>")
+        critical_block = crew_content_content[start:end]
+        assert "pipeline" not in critical_block.lower()
+
+    def test_no_old_todo_pipeline_stages(self, crew_content_content: str):
+        """Old pipeline-style todo like 'Decode content intent (audience' should be gone."""
+        assert "Decode content intent (audience" not in crew_content_content
+
+
+class TestContentFidelityConvergencePresent:
+    """The rewrite must introduce fidelity convergence as the core model."""
+
+    def test_mentions_fidelity(self, crew_content_lower: str):
+        assert "fidelity" in crew_content_lower
+
+    def test_mentions_convergence(self, crew_content_lower: str):
+        assert "convergence" in crew_content_lower
+
+    def test_mentions_lens(self, crew_content_lower: str):
+        assert "lens" in crew_content_lower
+
+
+class TestContentConvergenceLoop:
+    """The mode must describe or reference the convergence loop."""
+
+    def test_assess_pattern(self, crew_content_lower: str):
+        assert "assess" in crew_content_lower
+
+    def test_route_or_weakest_lens(self, crew_content_lower: str):
+        assert (
+            "weakest lens" in crew_content_lower
+            or "priority gap" in crew_content_lower
+            or "route" in crew_content_lower
+        )
+
+    def test_convergence_target(self, crew_content_lower: str):
+        assert "target" in crew_content_lower
+
+
+class TestContentLensesAndAgents:
+    """All five agents must be referenced."""
+
+    @pytest.mark.parametrize("agent", CREW_AGENTS)
+    def test_agent_referenced(self, crew_content_lower: str, agent: str):
+        assert agent in crew_content_lower, f"Missing agent reference: {agent}"
+
+
+class TestContentOrchestratorRole:
+    """The orchestrator role must be preserved."""
+
+    def test_orchestrator_mentioned(self, crew_content_lower: str):
+        assert "orchestrat" in crew_content_lower
+
+    def test_does_not_implement(self, crew_content_lower: str):
+        assert "do not" in crew_content_lower or "you do not" in crew_content_lower
+
+
+class TestContentReferencesProtocol:
+    """Mode file should reference crew-instructions.md and fidelity-framework.md."""
+
+    def test_references_crew_instructions(self, crew_content_content: str):
+        assert "crew-instructions.md" in crew_content_content
+
+    def test_references_fidelity_framework(self, crew_content_content: str):
+        assert "fidelity-framework.md" in crew_content_content
+
+
+class TestContentAntiRationalization:
+    """Anti-rationalization must be present and use fidelity concepts."""
+
+    def test_anti_rationalization_section(self, crew_content_content: str):
+        assert (
+            "Anti-Rationalization" in crew_content_content
+            or "anti-rationalization" in crew_content_content
+        )
+
+    def test_fidelity_aware_anti_patterns(self, crew_content_lower: str):
+        """At least one anti-pattern should reference fidelity concepts."""
+        assert "anti-rationalization" in crew_content_lower
+        section_start = crew_content_lower.index("anti-rationalization")
+        anti_rat_section = crew_content_lower[section_start:]
+        assert "fidelity" in anti_rat_section
+
+
+class TestContentTransitions:
+    """Mode transitions should still be documented."""
+
+    def test_transitions_section(self, crew_content_content: str):
+        assert (
+            "Transition" in crew_content_content or "transition" in crew_content_content
+        )
+
+    def test_crew_build_transition(self, crew_content_lower: str):
+        """Content should transition to crew-build for code examples."""
+        assert "crew-build" in crew_content_lower
+
+    def test_mode_clear(self, crew_content_lower: str):
+        assert "clear" in crew_content_lower
+
+
+class TestContentApprovalPoints:
+    """Fidelity-based approval points should be mentioned."""
+
+    def test_approval_mentioned(self, crew_content_lower: str):
+        assert "approval" in crew_content_lower
+
+    def test_no_old_numbered_gates(self, crew_content_content: str):
+        assert "GATE 1" not in crew_content_content
+        assert "GATE 2" not in crew_content_content
+        assert "GATE 3" not in crew_content_content
+
+
+class TestContentDomainIdentity:
+    """Content-specific domain tuning must be preserved."""
+
+    def test_content_domain_mentioned(self, crew_content_lower: str):
+        assert "content" in crew_content_lower
+
+    def test_writing_or_documentation_context(self, crew_content_lower: str):
+        """Content crew should still reference writing or documentation concepts."""
+        assert "writing" in crew_content_lower or "documentation" in crew_content_lower
+
+    def test_audience_mentioned(self, crew_content_lower: str):
+        """Content domain should reference audience."""
+        assert "audience" in crew_content_lower
+
+    def test_clarity_mentioned(self, crew_content_lower: str):
+        """Content domain should reference clarity."""
+        assert "clarity" in crew_content_lower
+
+
+class TestContentDomainTuningReference:
+    """Should reference domain-tuning.md for domain-specific criteria."""
+
+    def test_domain_tuning_reference(self, crew_content_content: str):
+        assert "domain-tuning.md" in crew_content_content
