@@ -37,6 +37,37 @@ LENS_KEYS = [
 ]
 
 
+def _extract_domain_section(content_lower: str, domain: str) -> str:
+    """Extract the text of a single domain's H2 section (lower-cased).
+
+    Returns the slice from the domain's ``## `` header up to the next ``## ``
+    header (or end-of-file).  Returns an empty string if the domain header is
+    not found.
+    """
+    import re
+
+    h2_positions = [
+        m.start() for m in re.finditer(r"^## ", content_lower, re.MULTILINE)
+    ]
+    domain_start = -1
+    for pos in h2_positions:
+        line_end = content_lower.find("\n", pos)
+        header_line = (
+            content_lower[pos:line_end] if line_end != -1 else content_lower[pos:]
+        )
+        if domain in header_line:
+            domain_start = pos
+            break
+    if domain_start == -1:
+        return ""
+    next_h2 = len(content_lower)
+    for pos in h2_positions:
+        if pos > domain_start:
+            next_h2 = pos
+            break
+    return content_lower[domain_start:next_h2]
+
+
 @pytest.fixture(scope="module")
 def tuning_content() -> str:
     """Load domain-tuning.md once for the entire test module."""
@@ -95,27 +126,12 @@ class TestOldAgentHeadersRemoved:
 # AC-3: All five domains present as sections
 # ---------------------------------------------------------------------------
 class TestAllDomainsPresent:
-    """All five crew domains must have dedicated sections."""
+    """All five crew domains must have dedicated H2 sections."""
 
     @pytest.mark.parametrize("domain", DOMAINS)
     def test_domain_section_present(self, tuning_lower: str, domain: str):
-        assert domain in tuning_lower, f"Domain '{domain}' not found"
-
-    def test_build_domain_section(self, tuning_content: str):
-        assert "## " in tuning_content  # At least one H2 header
-        assert "build" in tuning_content.lower()
-
-    def test_product_domain_section(self, tuning_content: str):
-        assert "product" in tuning_content.lower()
-
-    def test_platform_domain_section(self, tuning_content: str):
-        assert "platform" in tuning_content.lower()
-
-    def test_research_domain_section(self, tuning_content: str):
-        assert "research" in tuning_content.lower()
-
-    def test_content_domain_section(self, tuning_content: str):
-        assert "content" in tuning_content.lower()
+        section = _extract_domain_section(tuning_lower, domain)
+        assert section, f"Domain '{domain}' not found as an H2 section"
 
 
 # ---------------------------------------------------------------------------
@@ -164,35 +180,10 @@ class TestLensBasedStructure:
 
     def test_multiple_lens_references_per_domain(self, tuning_lower: str):
         """Each domain section should reference multiple lenses."""
-        import re
-
-        # Find all H2-level domain section starts (## Domain: ... lines)
-        h2_positions = [
-            m.start() for m in re.finditer(r"^## ", tuning_lower, re.MULTILINE)
-        ]
-
         for domain in DOMAINS:
-            # Find the H2 header for this domain
-            domain_start = -1
-            for pos in h2_positions:
-                line_end = tuning_lower.find("\n", pos)
-                header_line = (
-                    tuning_lower[pos:line_end] if line_end != -1 else tuning_lower[pos:]
-                )
-                if domain in header_line:
-                    domain_start = pos
-                    break
-            if domain_start == -1:
+            section = _extract_domain_section(tuning_lower, domain)
+            if not section:
                 continue
-
-            # Find next H2 header or end of file
-            next_h2 = len(tuning_lower)
-            for pos in h2_positions:
-                if pos > domain_start:
-                    next_h2 = pos
-                    break
-
-            domain_section = tuning_lower[domain_start:next_h2]
             lens_count = sum(
                 1
                 for lens in [
@@ -202,7 +193,7 @@ class TestLensBasedStructure:
                     "quality",
                     "ship",
                 ]
-                if lens in domain_section
+                if lens in section
             )
             assert lens_count >= 4, (
                 f"Domain '{domain}' should reference at least 4 lenses, found {lens_count}"
@@ -239,42 +230,51 @@ class TestFidelityFrameworkReference:
 # AC-8: Domain-specific criteria (not just generic restatements)
 # ---------------------------------------------------------------------------
 class TestDomainSpecificCriteria:
-    """Each domain must have criteria specific to that domain, not generic."""
+    """Each domain section must contain criteria specific to that domain."""
 
     def test_build_has_code_specific_criteria(self, tuning_lower: str):
-        """Build domain should reference code-specific concepts."""
+        """Build domain section should reference code-specific concepts."""
+        section = _extract_domain_section(tuning_lower, "build")
+        assert section, "build domain section not found"
         assert any(
-            term in tuning_lower
+            term in section
             for term in ["test", "type", "lint", "function", "module", "code"]
-        )
+        ), "build section missing code-specific criteria"
 
     def test_product_has_product_specific_criteria(self, tuning_lower: str):
-        """Product domain should reference product-specific concepts."""
+        """Product domain section should reference product-specific concepts."""
+        section = _extract_domain_section(tuning_lower, "product")
+        assert section, "product domain section not found"
         assert any(
-            term in tuning_lower
-            for term in ["user", "stakeholder", "decision", "ux", "prd"]
-        )
+            term in section for term in ["user", "stakeholder", "decision", "ux", "prd"]
+        ), "product section missing product-specific criteria"
 
     def test_research_has_research_specific_criteria(self, tuning_lower: str):
-        """Research domain should reference research-specific concepts."""
+        """Research domain section should reference research-specific concepts."""
+        section = _extract_domain_section(tuning_lower, "research")
+        assert section, "research domain section not found"
         assert any(
-            term in tuning_lower
+            term in section
             for term in ["evidence", "source", "citation", "finding", "synthesis"]
-        )
+        ), "research section missing research-specific criteria"
 
     def test_content_has_content_specific_criteria(self, tuning_lower: str):
-        """Content domain should reference writing-specific concepts."""
+        """Content domain section should reference writing-specific concepts."""
+        section = _extract_domain_section(tuning_lower, "content")
+        assert section, "content domain section not found"
         assert any(
-            term in tuning_lower
+            term in section
             for term in ["audience", "tone", "clarity", "reader", "prose"]
-        )
+        ), "content section missing writing-specific criteria"
 
     def test_platform_has_platform_specific_criteria(self, tuning_lower: str):
-        """Platform domain should reference infrastructure-specific concepts."""
+        """Platform domain section should reference infrastructure-specific concepts."""
+        section = _extract_domain_section(tuning_lower, "platform")
+        assert section, "platform domain section not found"
         assert any(
-            term in tuning_lower
+            term in section
             for term in ["api", "contract", "interface", "consumer", "breaking"]
-        )
+        ), "platform section missing infrastructure-specific criteria"
 
 
 # ---------------------------------------------------------------------------
