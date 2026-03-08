@@ -24,40 +24,19 @@ CREW_AGENTS = ["intent-analyst", "architect", "builder", "critic", "shipper"]
 
 
 # ---------------------------------------------------------------------------
-# Fixtures
+# Fixtures — each domain needs a content + lowercased pair.
+# The helper keeps the repeated load-and-assert logic in one place.
 # ---------------------------------------------------------------------------
-@pytest.fixture(scope="module")
-def crew_platform_content() -> str:
-    """Load modes/crew-platform.md once for the entire test module."""
-    path = MODES_DIR / "crew-platform.md"
-    assert path.exists(), f"crew-platform.md not found: {path}"
+def _load_crew_mode(name: str) -> str:
+    """Load a crew mode file by domain name."""
+    path = MODES_DIR / f"crew-{name}.md"
+    assert path.exists(), f"crew-{name}.md not found: {path}"
     return path.read_text()
-
-
-@pytest.fixture(scope="module")
-def crew_platform_lower(crew_platform_content: str) -> str:
-    return crew_platform_content.lower()
-
-
-@pytest.fixture(scope="module")
-def crew_research_content() -> str:
-    """Load modes/crew-research.md once for the entire test module."""
-    path = MODES_DIR / "crew-research.md"
-    assert path.exists(), f"crew-research.md not found: {path}"
-    return path.read_text()
-
-
-@pytest.fixture(scope="module")
-def crew_research_lower(crew_research_content: str) -> str:
-    return crew_research_content.lower()
 
 
 @pytest.fixture(scope="module")
 def crew_build_content() -> str:
-    """Load modes/crew-build.md once for the entire test module."""
-    path = MODES_DIR / "crew-build.md"
-    assert path.exists(), f"crew-build.md not found: {path}"
-    return path.read_text()
+    return _load_crew_mode("build")
 
 
 @pytest.fixture(scope="module")
@@ -67,15 +46,32 @@ def crew_build_lower(crew_build_content: str) -> str:
 
 @pytest.fixture(scope="module")
 def crew_product_content() -> str:
-    """Load modes/crew-product.md once for the entire test module."""
-    path = MODES_DIR / "crew-product.md"
-    assert path.exists(), f"crew-product.md not found: {path}"
-    return path.read_text()
+    return _load_crew_mode("product")
 
 
 @pytest.fixture(scope="module")
 def crew_product_lower(crew_product_content: str) -> str:
     return crew_product_content.lower()
+
+
+@pytest.fixture(scope="module")
+def crew_platform_content() -> str:
+    return _load_crew_mode("platform")
+
+
+@pytest.fixture(scope="module")
+def crew_platform_lower(crew_platform_content: str) -> str:
+    return crew_platform_content.lower()
+
+
+@pytest.fixture(scope="module")
+def crew_research_content() -> str:
+    return _load_crew_mode("research")
+
+
+@pytest.fixture(scope="module")
+def crew_research_lower(crew_research_content: str) -> str:
+    return crew_research_content.lower()
 
 
 # ===================================================================
