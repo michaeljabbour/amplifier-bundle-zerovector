@@ -1,11 +1,11 @@
-"""Tool-fidelity-state module — session-level fidelity convergence tracking."""
+"""Tool-fidelity-state module -- session-level fidelity convergence tracking."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
 
-# Guard import for ToolResult — fall back to plain dict when amplifier_core
+# Guard import for ToolResult -- fall back to plain dict when amplifier_core
 # is not installed (e.g. in isolated test environments).
 try:
     from amplifier_core.models import ToolResult
@@ -16,7 +16,10 @@ except ImportError:
 
 __amplifier_module_type__ = "tool"
 
-# ── Constants ───────────────────────────────────────────────────
+# -- Constants ---------------------------------------------------------------
+
+_DEFAULT_TARGET: float = 0.85
+_DEFAULT_DOMAIN: str = "general"
 
 DEFAULT_LENSES: list[str] = [
     "intent_clarity",
@@ -35,7 +38,7 @@ _RECOMMENDATIONS: dict[str, str] = {
 }
 
 
-# ── Helpers ─────────────────────────────────────────────────────
+# -- Helpers -----------------------------------------------------------------
 
 
 def _tool_result(content: str, *, is_error: bool = False):
@@ -47,7 +50,7 @@ def _tool_result(content: str, *, is_error: bool = False):
     return {"content": content, "is_error": is_error}
 
 
-# ── FidelityState ───────────────────────────────────────────────
+# -- FidelityState -----------------------------------------------------------
 
 
 @dataclass
@@ -56,15 +59,15 @@ class FidelityState:
 
     lens_scores: dict[str, float] = field(default_factory=dict)
     overall: float = 0.0
-    target: float = 0.85
-    domain: str = "general"
+    target: float = _DEFAULT_TARGET
+    domain: str = _DEFAULT_DOMAIN
     priority_gap: dict[str, Any] = field(default_factory=dict)
 
     def update_fidelity(
         self,
         lens_scores: dict[str, float],
-        domain: str = "general",
-        target: float = 0.85,
+        domain: str = _DEFAULT_DOMAIN,
+        target: float = _DEFAULT_TARGET,
     ) -> None:
         """Push new scores into state after a multi-lens assessment."""
         self.lens_scores = {k: max(0.0, min(1.0, v)) for k, v in lens_scores.items()}
@@ -82,7 +85,9 @@ class FidelityState:
         self.priority_gap = {
             "lens": lowest_lens,
             "score": self.lens_scores[lowest_lens],
-            "recommendation": _RECOMMENDATIONS.get(lowest_lens, ""),
+            "recommendation": _RECOMMENDATIONS.get(
+                lowest_lens, "No routing recommendation available"
+            ),
         }
 
     def get_state(self) -> dict[str, Any]:
@@ -96,7 +101,7 @@ class FidelityState:
         }
 
 
-# ── UpdateFidelityTool ──────────────────────────────────────────
+# -- UpdateFidelityTool ------------------------------------------------------
 
 
 class UpdateFidelityTool:
@@ -119,12 +124,12 @@ class UpdateFidelityTool:
                 },
                 "domain": {
                     "type": "string",
-                    "default": "general",
+                    "default": _DEFAULT_DOMAIN,
                     "description": "Domain context for the assessment",
                 },
                 "target": {
                     "type": "number",
-                    "default": 0.85,
+                    "default": _DEFAULT_TARGET,
                     "description": "Convergence target threshold",
                 },
             },
@@ -136,8 +141,8 @@ class UpdateFidelityTool:
         if not lens_scores:
             return _tool_result("No lens_scores provided", is_error=True)
 
-        domain = input.get("domain", "general")
-        target = input.get("target", 0.85)
+        domain = input.get("domain", _DEFAULT_DOMAIN)
+        target = input.get("target", _DEFAULT_TARGET)
 
         self.state.update_fidelity(lens_scores, domain=domain, target=target)
 
@@ -151,14 +156,14 @@ class UpdateFidelityTool:
         return _tool_result(summary)
 
 
-# ── mount ───────────────────────────────────────────────────────
+# -- mount -------------------------------------------------------------------
 
 
 async def mount(coordinator, config: dict | None = None) -> dict[str, str]:
     """Mount the fidelity-state tool and register capabilities."""
     config = config or {}
-    target = config.get("target", 0.85)
-    domain = config.get("domain", "general")
+    target = config.get("target", _DEFAULT_TARGET)
+    domain = config.get("domain", _DEFAULT_DOMAIN)
 
     state = FidelityState(target=target, domain=domain)
     tool = UpdateFidelityTool(state)
