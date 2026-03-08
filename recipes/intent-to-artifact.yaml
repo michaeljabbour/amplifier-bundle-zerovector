@@ -1,38 +1,45 @@
-# Zero-Vector Intent-to-Artifact — Master Orchestrator (v0.2)
-# Thin pipeline that composes 4 focused stages. Run sub-recipes independently:
+# Zero-Vector Intent-to-Artifact — Master Orchestrator (v0.3)
+# Fidelity convergence wrapper: decode intent → converge to target fidelity → deliver
 #
-#   zerovector:recipes/decode-intent.yaml     — intent capture + spec only
-#   zerovector:recipes/build-and-review.yaml  — spec + build + review loop
-#   zerovector:recipes/verify-artifact.yaml   — evidence verification pass
-#   zerovector:recipes/finish-artifact.yaml   — finish action (merge/pr/keep/discard)
+# v0.3 replaces the linear 4-stage pipeline (decode → build → verify → finish)
+# with a 3-stage fidelity convergence wrapper:
+#   Stage 1: decode-intent       — intent capture + spec (same as v0.2)
+#   Stage 2: fidelity-converge   — multi-lens while-loop drives all 5 fidelity lenses
+#   Stage 3: finish-artifact     — execute delivery action (merge / pr / keep)
+#
+# Approval Gates (2):
+#   1. After decode  — approve intent + spec before fidelity convergence begins
+#   2. After converge — review convergence result, choose finish action
+#
+# Sub-recipes (run independently):
+#   zerovector:recipes/decode-intent.yaml       — intent capture + spec only
+#   zerovector:recipes/fidelity-convergence.yaml — core convergence engine
+#   zerovector:recipes/finish-artifact.yaml      — finish action (merge/pr/keep/discard)
 #
 # Usage (full pipeline):
 #   amplifier run "execute zerovector:recipes/intent-to-artifact.yaml
 #                  with intent='my intent' domain='build'"
 #
 # Domains: build | product | platform | research | content | general
-#
-# Approval Gates (3):
-#   1. After decode  — approve intent + spec before build begins
-#   2. After build   — approve artifact before final verification
-#   3. After verify  — choose finish action (merge / pr / keep / deny=discard)
 
 name: "intent-to-artifact"
-description: "Zero-Vector master pipeline: state intent once, receive a delivered artifact"
-version: "0.2.0"
+description: "Zero-Vector master pipeline v0.3: fidelity convergence wrapper — state intent once, converge to target fidelity, deliver"
+version: "0.3.0"
 author: "Zero-Vector Bundle"
-tags: ["workflow", "zero-vector", "intent-to-artifact", "orchestrator", "full-pipeline"]
+tags: ["workflow", "zero-vector", "intent-to-artifact", "orchestrator", "fidelity", "convergence", "v0.3"]
 
 context:
-  intent: ""            # Required: the raw human intent
-  domain: "general"    # Optional: build | product | platform | research | content | general
-  project_path: "."    # Project directory (defaults to current)
-  _approval_message: "" # Populated by engine when user approves with a message
+  intent: ""              # Required: the raw human intent
+  domain: "general"       # Optional: build | product | platform | research | content | general
+  project_path: "."       # Project directory (defaults to current)
+  target_fidelity: "0.85" # Convergence threshold (0.0–1.0); loop exits when reached
+  fidelity_score: "0"     # Current overall fidelity score; updated each loop iteration
+  _approval_message: ""   # Populated by engine when user approves with a message
 
 stages:
   # ==========================================================================
   # STAGE 1: DECODE INTENT
-  # Analyst decodes intent → Architect produces spec → human approves before build
+  # Analyst decodes intent → Architect produces spec → human approves before convergence
   # Standalone equivalent: zerovector:recipes/decode-intent.yaml
   # ==========================================================================
   - name: "decode-intent"
@@ -127,14 +134,14 @@ stages:
           4. Estimated complexity: simple / medium / complex
           5. Any risks or open questions
 
-          End with: "Ready to build."
+          End with: "Ready for fidelity convergence."
         output: "decode_summary"
 
-    # APPROVAL GATE 1: Human reviews intent + spec before build
+    # APPROVAL GATE 1: Human reviews intent + spec before fidelity convergence
     approval:
       required: true
       prompt: |
-        ## GATE 1 — Approve Intent + Spec Before Build
+        ## GATE 1 — Approve Intent + Spec Before Fidelity Convergence
 
         {{decode_summary}}
 
@@ -142,15 +149,15 @@ stages:
         Intent doc: {{paths.intent_path}}
         Spec doc:   {{paths.spec_path}}
 
-        **APPROVE** to proceed to build.
-        **DENY** to stop here — revise intent or spec and re-run.
+        Review the Intent Document and Specification above. APPROVE to proceed to fidelity convergence, or DENY to stop.
 
   # ==========================================================================
-  # STAGE 2: BUILD AND REVIEW
-  # Builder implements → Critic validates (2-pass) → convergence loop (max 3)
-  # Standalone equivalent: zerovector:recipes/build-and-review.yaml
+  # STAGE 2: FIDELITY CONVERGE
+  # Multi-lens while-loop assesses 5 fidelity lenses and routes to the weakest
+  # until overall fidelity >= target_fidelity or max iterations reached
+  # Standalone equivalent: zerovector:recipes/fidelity-convergence.yaml
   # ==========================================================================
-  - name: "build-and-review"
+  - name: "fidelity-converge"
     steps:
       - id: "load-approved-spec"
         type: "bash"
@@ -158,43 +165,23 @@ stages:
           cat "{{project_path}}/{{paths.spec_path}}"
         output: "approved_spec"
 
-      - id: "build-artifact"
-        agent: "zerovector:builder"
-        prompt: |
-          Build the artifact from this approved Specification.
-
-          Specification:
-          {{approved_spec}}
-
-          Intent Document:
-          {{intent_document}}
-
-          Domain: {{domain}}
-          Project path: {{project_path}}
-
-          Instructions:
-          - Implement each task in spec order
-          - Code: test-first, run checks after each task, commit atomically
-          - Documents: follow section structure exactly, write for stated audience
-          - Configuration: validate with dry-run if possible
-          - No scope creep — stop at spec boundaries
-
-          Use your structured Output Contract format when reporting completion.
-        output: "build_result"
-        on_error: "continue"
-
-      - id: "initial-review"
+      - id: "initial-assessment"
         agent: "zerovector:critic"
         prompt: |
-          Validate this artifact using your two-pass protocol.
+          Perform a multi-lens fidelity assessment of the current state.
 
-          Pass 1 — Spec/Intent Compliance:
-            Does every task meet its acceptance criteria?
-            Does the artifact match the Intent Document outcome?
+          Assess each of the 5 fidelity lenses on a 0.0–1.0 scale:
 
-          Pass 2 — Quality/Robustness:
-            Run tests, linters, type checks where applicable.
-            Check for scope creep, debug artifacts, missing edge cases.
+          1. intent_clarity   — Is the intent fully decoded, unambiguous, and actionable?
+          2. specification    — Does a complete, implementation-ready spec exist?
+          3. implementation   — Does working, tested code/artifact exist that meets the spec?
+          4. quality          — Does the artifact meet quality, robustness, and edge-case standards?
+          5. ship_readiness   — Is the artifact ready to ship (docs, tests, clean history, deployment)?
+
+          For each lens, provide:
+            - score: 0.0–1.0
+            - gap: one-sentence description of what is missing (or "none" if score >= 0.85)
+            - priority: true if this is the weakest lens (exactly one lens gets priority: true)
 
           Intent Document:
           {{intent_document}}
@@ -202,62 +189,53 @@ stages:
           Specification:
           {{approved_spec}}
 
-          Build Result:
-          {{build_result}}
-
           Domain: {{domain}}
           Project path: {{project_path}}
 
-          End your report with the machine-readable verdict on its own line:
-          VERDICT: PASS|CONDITIONAL_PASS|FAIL
-        output: "critic_report"
+          Respond ONLY with valid JSON matching this schema:
+          {
+            "intent_clarity":  {"score": 0.0, "gap": "...", "priority": false},
+            "specification":   {"score": 0.0, "gap": "...", "priority": false},
+            "implementation":  {"score": 0.0, "gap": "...", "priority": false},
+            "quality":         {"score": 0.0, "gap": "...", "priority": false},
+            "ship_readiness":  {"score": 0.0, "gap": "...", "priority": false},
+            "overall":         0.0,
+            "priority_gap":    "lens_name"
+          }
+        parse_json: true
+        output: "assessment"
 
-      - id: "parse-initial-verdict"
+      - id: "extract-score"
         type: "bash"
         command: |
-          VERDICT=$(echo "{{critic_report}}" | grep "^VERDICT:" | awk '{print $2}' | tr -d '[:space:]')
-          if [ -z "$VERDICT" ]; then VERDICT="FAIL"; fi
-          if [ "$VERDICT" = "PASS" ]; then NEEDS_REVISION="false"; else NEEDS_REVISION="true"; fi
-          echo "{\"verdict\": \"$VERDICT\", \"needs_revision\": $NEEDS_REVISION}"
+          SCORE=$(echo '{{assessment}}' | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          print(data.get('overall', 0))
+          " 2>/dev/null || echo "0")
+          echo "{\"fidelity_score\": \"$SCORE\"}"
         parse_json: true
-        output: "verdict_status"
+        output: "score_result"
 
-      - id: "refinement-loop"
-        while_condition: "{{verdict_status.needs_revision}}"
-        max_while_iterations: 3
+      - id: "convergence-loop"
+        while_condition: "{{fidelity_score}} < {{target_fidelity}}"
+        max_while_iterations: 8
+        update_context:
+          fidelity_score: "{{assessment.overall}}"
         while_steps:
-          - id: "refine-build"
-            agent: "zerovector:builder"
+          # -----------------------------------------------------------------------
+          # Route to the weakest lens agent and close the gap
+          # -----------------------------------------------------------------------
+          - id: "route-to-gap"
+            agent: "self"
             prompt: |
-              Revise the artifact based on the Critic's report.
-              Address every FAIL and CONDITIONAL_PASS issue listed.
-              Do not change anything the Critic approved.
+              The multi-lens fidelity assessment identified the following priority gap:
 
-              Critic Report (issues to fix):
-              {{critic_report}}
+              Priority gap lens: {{assessment.priority_gap}}
+              Current fidelity score: {{fidelity_score}} / {{target_fidelity}} target
 
-              Specification (source of truth):
-              {{approved_spec}}
-
-              Intent Document:
-              {{intent_document}}
-
-              Domain: {{domain}}
-              Project path: {{project_path}}
-
-              Use your structured Output Contract format when reporting completion.
-            output: "build_result"
-
-          - id: "re-review"
-            agent: "zerovector:critic"
-            prompt: |
-              Re-validate the revised artifact using your two-pass protocol.
-
-              Pass 1 — Spec/Intent Compliance
-              Pass 2 — Quality/Robustness
-
-              Previous Critic Report (issues that were flagged):
-              {{critic_report}}
+              Full assessment:
+              {{assessment}}
 
               Intent Document:
               {{intent_document}}
@@ -265,117 +243,99 @@ stages:
               Specification:
               {{approved_spec}}
 
-              Revised Build Result:
-              {{build_result}}
+              Domain: {{domain}}
+              Project path: {{project_path}}
+
+              Delegate to the agent responsible for closing the priority gap lens:
+                - intent_clarity  → zerovector:intent-analyst  (refine the Intent Document)
+                - specification   → zerovector:architect       (produce or refine the Specification)
+                - implementation  → zerovector:builder         (implement or fix the artifact)
+                - quality         → zerovector:critic          (run quality pass and address issues)
+                - ship_readiness  → zerovector:shipper         (prepare artifact for delivery)
+
+              Instruct the chosen agent to address the gap described in the assessment
+              and return the updated artifact or document.
+            output: "gap_closure_result"
+            on_error: "continue"
+
+          # -----------------------------------------------------------------------
+          # Re-assess all 5 lenses after gap closure
+          # -----------------------------------------------------------------------
+          - id: "re-assess"
+            agent: "zerovector:critic"
+            prompt: |
+              Re-assess all 5 fidelity lenses after the gap closure action.
+
+              Previous assessment:
+              {{assessment}}
+
+              Gap closure result:
+              {{gap_closure_result}}
+
+              Intent Document:
+              {{intent_document}}
+
+              Specification:
+              {{approved_spec}}
 
               Domain: {{domain}}
               Project path: {{project_path}}
 
-              End your report with the machine-readable verdict on its own line:
-              VERDICT: PASS|CONDITIONAL_PASS|FAIL
-            output: "critic_report"
-
-          - id: "re-parse-verdict"
-            type: "bash"
-            command: |
-              VERDICT=$(echo "{{critic_report}}" | grep "^VERDICT:" | awk '{print $2}' | tr -d '[:space:]')
-              if [ -z "$VERDICT" ]; then VERDICT="FAIL"; fi
-              if [ "$VERDICT" = "PASS" ]; then NEEDS_REVISION="false"; else NEEDS_REVISION="true"; fi
-              echo "{\"verdict\": \"$VERDICT\", \"needs_revision\": $NEEDS_REVISION}"
+              Assess each lens on a 0.0–1.0 scale.
+              Respond ONLY with valid JSON matching this schema:
+              {
+                "intent_clarity":  {"score": 0.0, "gap": "...", "priority": false},
+                "specification":   {"score": 0.0, "gap": "...", "priority": false},
+                "implementation":  {"score": 0.0, "gap": "...", "priority": false},
+                "quality":         {"score": 0.0, "gap": "...", "priority": false},
+                "ship_readiness":  {"score": 0.0, "gap": "...", "priority": false},
+                "overall":         0.0,
+                "priority_gap":    "lens_name"
+              }
             parse_json: true
-            output: "verdict_status"
+            output: "assessment"
 
-      - id: "build-summary"
+      - id: "converge-summary"
         type: "bash"
         command: |
-          echo "=== BUILD + REVIEW SUMMARY ==="
-          echo "Project: {{project_path}} | Domain: {{domain}}"
-          echo "Final critic verdict: {{verdict_status.verdict}}"
+          echo "============================================"
+          echo "  ZERO-VECTOR FIDELITY CONVERGENCE RESULT"
+          echo "============================================"
           echo ""
-          echo "=== ARTIFACTS ==="
-          echo "Intent: {{paths.intent_path}}"
-          echo "Spec:   {{paths.spec_path}}"
-        output: "build_summary"
+          echo "Intent:          {{intent}}"
+          echo "Domain:          {{domain}}"
+          echo "Target fidelity: {{target_fidelity}}"
+          echo "Final score:     {{fidelity_score}}"
+          echo ""
+          echo "Lens scores (final assessment):"
+          echo "  intent_clarity:  {{assessment.intent_clarity.score}}"
+          echo "  specification:   {{assessment.specification.score}}"
+          echo "  implementation:  {{assessment.implementation.score}}"
+          echo "  quality:         {{assessment.quality.score}}"
+          echo "  ship_readiness:  {{assessment.ship_readiness.score}}"
+          echo ""
+          if [ "$(echo "{{fidelity_score}} >= {{target_fidelity}}" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
+            echo "STATUS: CONVERGED — target fidelity reached"
+          else
+            echo "STATUS: LOOP EXHAUSTED — manual review required (score: {{fidelity_score}})"
+          fi
+          echo ""
+          echo "Intent:  {{paths.intent_path}}"
+          echo "Spec:    {{paths.spec_path}}"
+          echo "============================================"
+        output: "convergence_report"
 
-    # APPROVAL GATE 2: Human reviews artifact + critic verdict before verification
+    # APPROVAL GATE 2: Human reviews convergence result, chooses finish action
     approval:
       required: true
       prompt: |
-        ## GATE 2 — Review Build Before Verification
+        ## GATE 2 — Fidelity Convergence Complete
 
-        {{build_summary}}
-
-        ---
-        Critic verdict: **{{verdict_status.verdict}}**
-
-        Full critic report:
-        {{critic_report}}
-
-        **APPROVE** to proceed to final verification.
-        **DENY** to stop here and discard.
-
-  # ==========================================================================
-  # STAGE 3: VERIFY ARTIFACT
-  # Evidence-first independent verification — confirms artifact is ship-ready
-  # Standalone equivalent: zerovector:recipes/verify-artifact.yaml
-  # ==========================================================================
-  - name: "verify-artifact"
-    steps:
-      - id: "gather-evidence"
-        agent: "zerovector:critic"
-        prompt: |
-          Run an evidence-first verification pass on this artifact.
-
-          Do NOT rely on the prior review — independently confirm with fresh evidence:
-          1. Run available test suites; capture and report actual output
-          2. Run linters / type checkers where applicable; report results
-          3. Check every Success Criterion in the Specification — met or unmet with evidence
-          4. Confirm files exist at all specified paths
-          5. Verify no debug artifacts, TODOs, or temporary code remain
-          6. Confirm integration points are intact
-
-          Intent Document:
-          {{intent_document}}
-
-          Specification:
-          {{approved_spec}}
-
-          Prior Critic Report:
-          {{critic_report}}
-
-          Domain: {{domain}}
-          Project path: {{project_path}}
-
-          Produce a Verification Evidence Report with:
-          - Evidence collected (actual command output, not assertions)
-          - Success criteria status (each criterion: MET / UNMET with evidence)
-          - Remaining risks (if any)
-          - Final recommendation: SHIP | HOLD
-
-          End your report with the machine-readable verdict on its own line:
-          VERDICT: PASS|CONDITIONAL_PASS|FAIL
-        output: "verification_report"
-
-      - id: "parse-final-verdict"
-        type: "bash"
-        command: |
-          VERDICT=$(echo "{{verification_report}}" | grep "^VERDICT:" | awk '{print $2}' | tr -d '[:space:]')
-          if [ -z "$VERDICT" ]; then VERDICT="FAIL"; fi
-          echo "{\"final_verdict\": \"$VERDICT\"}"
-        parse_json: true
-        output: "final_verdict"
-
-    # APPROVAL GATE 3: Human chooses finish action
-    approval:
-      required: true
-      prompt: |
-        ## GATE 3 — Verification Complete — Choose Finish Action
-
-        **Verification verdict: {{final_verdict.final_verdict}}**
-
-        {{verification_report}}
+        {{convergence_report}}
 
         ---
+        Fidelity convergence complete. Score: {{fidelity_score}}. APPROVE with your finish action (merge/pr/keep) or DENY to discard.
+
         Choose your finish action:
         - **APPROVE** with message **merge** — merge to main (or default) branch
         - **APPROVE** with message **pr** — open a pull request
@@ -383,7 +343,7 @@ stages:
         - **DENY** — discard artifact, do not ship
 
   # ==========================================================================
-  # STAGE 4: FINISH ARTIFACT
+  # STAGE 3: FINISH ARTIFACT
   # Execute the chosen finish action and produce delivery report
   # Standalone equivalent: zerovector:recipes/finish-artifact.yaml
   # ==========================================================================
@@ -414,11 +374,8 @@ stages:
           - keep:  commit cleanly on current branch; no merge, no PR
           - discard: this should not reach here; if it does, stop and report
 
-          Verification Report:
-          {{verification_report}}
-
-          Critic Report:
-          {{critic_report}}
+          Convergence Report:
+          {{convergence_report}}
 
           Intent Document:
           {{intent_document}}
@@ -436,13 +393,13 @@ stages:
         type: "bash"
         command: |
           echo "============================================"
-          echo "  ZERO-VECTOR PIPELINE COMPLETE"
+          echo "  ZERO-VECTOR PIPELINE COMPLETE (v0.3)"
           echo "============================================"
           echo ""
           echo "Intent:  {{intent}}"
           echo "Domain:  {{domain}}"
           echo "Action:  {{finish_action.action}}"
-          echo "Verdict: {{final_verdict.final_verdict}}"
+          echo "Fidelity score: {{fidelity_score}} / {{target_fidelity}} target"
           echo ""
           echo "Pipeline artifacts:"
           echo "  Intent: {{paths.intent_path}}"
