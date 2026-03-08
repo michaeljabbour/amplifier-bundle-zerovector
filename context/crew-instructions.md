@@ -246,6 +246,43 @@ See `domain-tuning.md` for detailed domain calibration per lens.
 
 ---
 
+## Fidelity State Updates (Root Session)
+
+The fidelity dashboard is only visible to the user when `update_fidelity` is called in YOUR session (the root session). Child agent sessions have their own fidelity state that the user cannot see.
+
+**After EVERY agent delegation returns, YOU must call `update_fidelity` with estimated scores:**
+
+| After This Agent Returns | Update These Lenses |
+|--------------------------|---------------------|
+| **intent-analyst** | `intent_clarity`: 0.75-0.90 (based on how complete the intent document is) |
+| **architect** | `specification`: 0.60-0.85 (based on spec completeness — tasks, acceptance criteria, interfaces) |
+| **builder** | `implementation`: 0.50-0.80 (based on code completion and test results in builder's report) |
+| **critic** | ALL lenses with the critic's exact scores from the JSON output |
+| **shipper** | `ship_readiness`: 0.60-0.90 (based on delivery status) |
+
+**Rules:**
+- Call `update_fidelity` ONCE after each delegation returns — not before, not during
+- Use the agent's output to estimate scores. Don't guess — read what they reported.
+- When the critic returns scores, use those EXACT numbers (they're precise). For other agents, estimate based on what they accomplished.
+- The dashboard updates after each call, so the user sees progressive improvement.
+
+**Example after architect returns a full spec:**
+```
+update_fidelity(
+  lens_scores={
+    "intent_clarity": 0.82,
+    "specification": 0.75,
+    "implementation": 0.0,
+    "quality": 0.0,
+    "ship_readiness": 0.0
+  },
+  domain="build",
+  target=0.85
+)
+```
+
+---
+
 ## Anti-Rationalization
 
 Catch yourself before these failures occur:

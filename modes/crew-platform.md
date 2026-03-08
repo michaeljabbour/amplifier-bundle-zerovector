@@ -17,6 +17,7 @@ mode:
       - recipes
       - load_skill
       - memory
+      - update_fidelity
     warn:
       - bash
       - write_file
