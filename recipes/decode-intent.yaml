@@ -1,0 +1,141 @@
+# Zero-Vector Decode Intent — Standalone Sub-Recipe
+# Runs: intent-analyst → save → architect spec → save → human approval
+#
+# Use this when you want to capture and approve intent/spec
+# before committing to a full build run.
+#
+# Usage:
+#   amplifier run "execute zerovector:recipes/decode-intent.yaml
+#                  with intent='my intent' domain='build'"
+#
+# Output variables passed to downstream recipes:
+#   intent_document — full Intent Document text
+#   specification   — full Specification Document text
+#   paths           — {intent_path, spec_path, slug}
+
+name: "decode-intent"
+description: "Zero-Vector intent capture: decode intent → produce spec → human approval"
+version: "0.2.0"
+author: "Zero-Vector Bundle"
+tags: ["workflow", "zero-vector", "decode", "intent", "sub-recipe"]
+
+context:
+  intent: ""            # Required: the raw human intent
+  domain: "general"    # Optional: build | product | platform | research | content | general
+  project_path: "."    # Project directory (defaults to current)
+  _approval_message: ""
+
+stages:
+  # ==========================================================================
+  # STAGE 1: DECODE + SPEC
+  # Analyst decodes intent → Architect produces spec → human approves
+  # ==========================================================================
+  - name: "decode-and-spec"
+    steps:
+      - id: "ensure-dirs"
+        type: "bash"
+        command: |
+          mkdir -p "{{project_path}}/docs/plans"
+          SLUG=$(echo "{{intent}}" | tr ' ' '-' | tr '[:upper:]' '[:lower:]' | cut -c1-40 | sed 's/-*$//')
+          DATE=$(date +%Y-%m-%d)
+          echo "{\"intent_path\": \"docs/plans/${DATE}-${SLUG}-intent.md\", \"spec_path\": \"docs/plans/${DATE}-${SLUG}-spec.md\", \"slug\": \"${SLUG}\"}"
+        parse_json: true
+        output: "paths"
+
+      - id: "decode-intent"
+        agent: "zerovector:intent-analyst"
+        prompt: |
+          Decode this intent and produce a complete Intent Document.
+
+          Raw Intent: {{intent}}
+          Domain: {{domain}}
+          Project path: {{project_path}}
+
+          Produce a structured Intent Document covering:
+          - The Job (one sentence: what is this artifact hired to do?)
+          - Outcome Definition (measurable success — what does "done" look like?)
+          - Scope (IN: what is included / OUT: what is explicitly excluded)
+          - Constraints (tech, time, existing systems, non-negotiables)
+          - Assumptions Made (state each assumption and why you made it)
+          - Anti-Goals (what this is NOT — restate clearly for the Builder)
+          - Risk Flags (what could go wrong if intent is misunderstood?)
+
+          Survey the project at {{project_path}} before producing the document.
+          Do not ask questions — make the best interpretation and document it.
+        output: "intent_document"
+
+      - id: "save-intent"
+        type: "bash"
+        command: |
+          cat > "{{project_path}}/{{paths.intent_path}}" << 'INTENT_EOF'
+          {{intent_document}}
+          INTENT_EOF
+          echo "Saved: {{paths.intent_path}}"
+        output: "intent_save_result"
+
+      - id: "produce-spec"
+        agent: "zerovector:architect"
+        prompt: |
+          Produce a Specification Document from this Intent Document.
+
+          Intent Document:
+          {{intent_document}}
+
+          Domain: {{domain}}
+          Project path: {{project_path}}
+
+          Include:
+          - What We're Building (one paragraph: artifact, purpose, boundaries)
+          - Structure (files/components with exact paths and types)
+          - Public Interface (signatures, API, section map — domain-appropriate)
+          - Implementation Tasks (ordered list, each task: What / Files / Acceptance Criteria)
+          - Integration Points (what this connects to and contracts to preserve)
+          - Error Handling / Edge Cases
+          - Success Criteria (measurable, maps to Intent Document Outcome)
+          - What This Is NOT (anti-goals restated as Builder guardrails)
+
+          Survey {{project_path}} for existing conventions before specifying.
+          Every task must have explicit acceptance criteria — Builder must never wonder "is this done?"
+        output: "specification"
+
+      - id: "save-spec"
+        type: "bash"
+        command: |
+          cat > "{{project_path}}/{{paths.spec_path}}" << 'SPEC_EOF'
+          {{specification}}
+          SPEC_EOF
+          echo "Saved: {{paths.spec_path}}"
+        output: "spec_save_result"
+
+      - id: "approval-summary"
+        agent: "zerovector:architect"
+        prompt: |
+          Produce a concise approval summary for this specification (10 lines max).
+
+          Specification:
+          {{specification}}
+
+          Provide:
+          1. What artifact will be built (one sentence)
+          2. Key design decisions (3–5 bullets)
+          3. Number of build tasks
+          4. Estimated complexity: simple / medium / complex
+          5. Any risks or open questions
+
+          End with: "Ready to build."
+        output: "approval_summary"
+
+    # APPROVAL GATE: Human approves intent + spec before build
+    approval:
+      required: true
+      prompt: |
+        ## Decode Complete — Approve Intent + Spec
+
+        {{approval_summary}}
+
+        ---
+        Intent doc: {{paths.intent_path}}
+        Spec doc:   {{paths.spec_path}}
+
+        **APPROVE** to proceed (pass outputs to build-and-review).
+        **DENY** to stop here — revise and re-run.

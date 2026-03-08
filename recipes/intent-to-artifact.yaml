@@ -1,47 +1,52 @@
-# Zero-Vector Intent-to-Artifact Pipeline
-# Full automated pipeline: intent → spec → build → validate → ship
+# Zero-Vector Intent-to-Artifact — Master Orchestrator (v0.2)
+# Thin pipeline that composes 4 focused stages. Run sub-recipes independently:
 #
-# Usage:
-#   amplifier run "execute zerovector:recipes/intent-to-artifact.yaml with intent='my intent here'"
-#   amplifier run "execute zerovector:recipes/intent-to-artifact.yaml with intent='...' domain='build'"
+#   zerovector:recipes/decode-intent.yaml     — intent capture + spec only
+#   zerovector:recipes/build-and-review.yaml  — spec + build + review loop
+#   zerovector:recipes/verify-artifact.yaml   — evidence verification pass
+#   zerovector:recipes/finish-artifact.yaml   — finish action (merge/pr/keep/discard)
 #
-# Domains: build | product | platform | research | content | general (default)
+# Usage (full pipeline):
+#   amplifier run "execute zerovector:recipes/intent-to-artifact.yaml
+#                  with intent='my intent' domain='build'"
 #
-# Approval Gates (2):
-#   1. After spec — approve before building
-#   2. After validation — approve to ship or deny to stop
+# Domains: build | product | platform | research | content | general
+#
+# Approval Gates (3):
+#   1. After decode  — approve intent + spec before build begins
+#   2. After build   — approve artifact before final verification
+#   3. After verify  — choose finish action (merge / pr / keep / deny=discard)
 
 name: "intent-to-artifact"
-description: "Zero-Vector pipeline: state intent once, receive a tested and delivered artifact"
-version: "0.1.0"
+description: "Zero-Vector master pipeline: state intent once, receive a delivered artifact"
+version: "0.2.0"
 author: "Zero-Vector Bundle"
-tags: ["workflow", "zero-vector", "intent-to-artifact", "full-pipeline"]
+tags: ["workflow", "zero-vector", "intent-to-artifact", "orchestrator", "full-pipeline"]
 
 context:
-  intent: ""           # Required: the raw human intent
-  domain: "general"   # Optional: build | product | platform | research | content | general
-  project_path: "."   # Project directory (defaults to current)
+  intent: ""            # Required: the raw human intent
+  domain: "general"    # Optional: build | product | platform | research | content | general
+  project_path: "."    # Project directory (defaults to current)
   _approval_message: "" # Populated by engine when user approves with a message
 
 stages:
   # ==========================================================================
-  # STAGE 1: Decode & Spec
-  # Decode intent → produce specification → human approves before build
+  # STAGE 1: DECODE INTENT
+  # Analyst decodes intent → Architect produces spec → human approves before build
+  # Standalone equivalent: zerovector:recipes/decode-intent.yaml
   # ==========================================================================
-  - name: "decode-and-spec"
+  - name: "decode-intent"
     steps:
-      # Ensure docs/plans directory exists for artifact storage
       - id: "ensure-dirs"
         type: "bash"
         command: |
           mkdir -p "{{project_path}}/docs/plans"
-          SLUG=$(echo "{{intent}}" | tr ' ' '-' | tr '[:upper:]' '[:lower:]' | cut -c1-40 | sed 's/-$//')
+          SLUG=$(echo "{{intent}}" | tr ' ' '-' | tr '[:upper:]' '[:lower:]' | cut -c1-40 | sed 's/-*$//')
           DATE=$(date +%Y-%m-%d)
-          echo "{\"intent_path\": \"docs/plans/${DATE}-${SLUG}-intent.md\", \"spec_path\": \"docs/plans/${DATE}-${SLUG}-spec.md\", \"artifact_slug\": \"${SLUG}\"}"
+          echo "{\"intent_path\": \"docs/plans/${DATE}-${SLUG}-intent.md\", \"spec_path\": \"docs/plans/${DATE}-${SLUG}-spec.md\", \"slug\": \"${SLUG}\"}"
         parse_json: true
         output: "paths"
 
-      # Stage 1a: Decode intent
       - id: "decode-intent"
         agent: "zerovector:intent-analyst"
         prompt: |
@@ -51,31 +56,29 @@ stages:
           Domain: {{domain}}
           Project path: {{project_path}}
 
-          Focus on:
-          - The job this artifact is hired to do
-          - Success definition (measurable outcome)
-          - Scope (IN / OUT)
-          - Constraints (tech, time, existing systems)
-          - Assumptions made (with rationale)
-          - Anti-goals
-          - Risk flags
+          Produce a structured Intent Document covering:
+          - The Job (one sentence: what is this artifact hired to do?)
+          - Outcome Definition (measurable success — what does "done" look like?)
+          - Scope (IN: what is included / OUT: what is explicitly excluded)
+          - Constraints (tech, time, existing systems, non-negotiables)
+          - Assumptions Made (state each assumption and why you made it)
+          - Anti-Goals (what this is NOT — restate clearly for the Builder)
+          - Risk Flags (what could go wrong if intent is misunderstood?)
 
           Survey the project at {{project_path}} before producing the document.
-          Format as clean markdown with the Intent Document structure.
+          Do not ask questions — make the best interpretation and document it.
         output: "intent_document"
 
-      # Save intent document
       - id: "save-intent"
         type: "bash"
         command: |
           cat > "{{project_path}}/{{paths.intent_path}}" << 'INTENT_EOF'
           {{intent_document}}
           INTENT_EOF
-          echo "Saved intent document to {{paths.intent_path}}"
-        output: "save_intent_result"
+          echo "Saved: {{paths.intent_path}}"
+        output: "intent_save_result"
 
-      # Stage 1b: Architect the solution
-      - id: "architect-solution"
+      - id: "produce-spec"
         agent: "zerovector:architect"
         prompt: |
           Produce a Specification Document from this Intent Document.
@@ -86,73 +89,75 @@ stages:
           Domain: {{domain}}
           Project path: {{project_path}}
 
-          Focus on:
-          - Artifact structure with exact file paths
-          - Public interfaces / API / section map (domain-appropriate)
-          - Ordered build tasks with acceptance criteria
-          - Integration points with existing code/systems
-          - Error handling and edge cases
-          - Success criteria that maps to Intent Document outcomes
+          Include:
+          - What We're Building (one paragraph: artifact, purpose, boundaries)
+          - Structure (files/components with exact paths and types)
+          - Public Interface (signatures, API, section map — domain-appropriate)
+          - Implementation Tasks (ordered list, each task has: What / Files / Acceptance Criteria)
+          - Integration Points (what this connects to and contracts to preserve)
+          - Error Handling / Edge Cases
+          - Success Criteria (measurable, maps to Intent Document Outcome)
+          - What This Is NOT (anti-goals restated as Builder guardrails)
 
-          Format as clean markdown with the Specification Document structure.
+          Survey {{project_path}} for existing conventions before specifying.
+          Every task must have explicit acceptance criteria — Builder must never wonder "is this done?"
         output: "specification"
 
-      # Save spec document
       - id: "save-spec"
         type: "bash"
         command: |
           cat > "{{project_path}}/{{paths.spec_path}}" << 'SPEC_EOF'
           {{specification}}
           SPEC_EOF
-          echo "Saved specification to {{paths.spec_path}}"
-        output: "save_spec_result"
+          echo "Saved: {{paths.spec_path}}"
+        output: "spec_save_result"
 
-      # Summarize for approval
-      - id: "summarize-for-approval"
+      - id: "decode-summary"
         agent: "zerovector:architect"
         prompt: |
-          Summarize this specification for human approval.
+          Produce a concise approval summary for this specification (10 lines max).
 
           Specification:
           {{specification}}
 
-          Provide a concise summary (10 lines max):
+          Provide:
           1. What artifact will be built (one sentence)
-          2. Key design decisions (3-5 bullets)
+          2. Key design decisions (3–5 bullets)
           3. Number of build tasks
           4. Estimated complexity: simple / medium / complex
           5. Any risks or open questions
-        output: "spec_summary"
 
-    # APPROVAL GATE 1: Human reviews spec before build begins
+          End with: "Ready to build."
+        output: "decode_summary"
+
+    # APPROVAL GATE 1: Human reviews intent + spec before build
     approval:
       required: true
       prompt: |
-        ## Specification Ready for Review
+        ## GATE 1 — Approve Intent + Spec Before Build
 
-        {{spec_summary}}
+        {{decode_summary}}
 
         ---
-        Intent document: {{paths.intent_path}}
-        Specification: {{paths.spec_path}}
+        Intent doc: {{paths.intent_path}}
+        Spec doc:   {{paths.spec_path}}
 
-        **APPROVE** to proceed to building.
-        **DENY** to revise the specification.
+        **APPROVE** to proceed to build.
+        **DENY** to stop here — revise intent or spec and re-run.
 
   # ==========================================================================
-  # STAGE 2: Build & Validate
-  # Build the artifact → validate fidelity → human approves ship action
+  # STAGE 2: BUILD AND REVIEW
+  # Builder implements → Critic validates (2-pass) → convergence loop (max 3)
+  # Standalone equivalent: zerovector:recipes/build-and-review.yaml
   # ==========================================================================
-  - name: "build-and-validate"
+  - name: "build-and-review"
     steps:
-      # Load the approved spec
-      - id: "load-spec"
+      - id: "load-approved-spec"
         type: "bash"
         command: |
           cat "{{project_path}}/{{paths.spec_path}}"
         output: "approved_spec"
 
-      # Stage 2a: Build the artifact
       - id: "build-artifact"
         agent: "zerovector:builder"
         prompt: |
@@ -161,27 +166,35 @@ stages:
           Specification:
           {{approved_spec}}
 
-          Original Intent:
+          Intent Document:
           {{intent_document}}
 
           Domain: {{domain}}
           Project path: {{project_path}}
 
           Instructions:
-          - Implement each task in order
-          - For code: test-first, run checks after each task, commit atomically
-          - For documents: follow section structure exactly, write for stated audience
-          - For configuration: validate (dry-run if possible)
+          - Implement each task in spec order
+          - Code: test-first, run checks after each task, commit atomically
+          - Documents: follow section structure exactly, write for stated audience
+          - Configuration: validate with dry-run if possible
           - No scope creep — stop at spec boundaries
-          - Report completion with evidence for each task's acceptance criteria
+
+          Use your structured Output Contract format when reporting completion.
         output: "build_result"
         on_error: "continue"
 
-      # Stage 2b: Validate fidelity
-      - id: "validate-artifact"
+      - id: "initial-review"
         agent: "zerovector:critic"
         prompt: |
-          Validate this artifact against the original intent and specification.
+          Validate this artifact using your two-pass protocol.
+
+          Pass 1 — Spec/Intent Compliance:
+            Does every task meet its acceptance criteria?
+            Does the artifact match the Intent Document outcome?
+
+          Pass 2 — Quality/Robustness:
+            Run tests, linters, type checks where applicable.
+            Check for scope creep, debug artifacts, missing edge cases.
 
           Intent Document:
           {{intent_document}}
@@ -195,74 +208,218 @@ stages:
           Domain: {{domain}}
           Project path: {{project_path}}
 
-          Produce a Validation Report with:
-          - Verdict: PASS | CONDITIONAL PASS | FAIL
-          - Fidelity assessment (job match, outcome match, scope integrity)
-          - Spec compliance (task-by-task verification)
-          - Quality assessment (tests, lint, clarity — domain-appropriate)
-          - If not PASS: specific issues with locations and recommendations
-        output: "validation_report"
+          End your report with the machine-readable verdict on its own line:
+          VERDICT: PASS|CONDITIONAL_PASS|FAIL
+        output: "critic_report"
 
-      # Present build + validation for approval
-      - id: "present-for-ship-decision"
+      - id: "parse-initial-verdict"
         type: "bash"
         command: |
-          echo "=== BUILD SUMMARY ==="
-          echo "Project: {{project_path}}"
-          echo "Domain: {{domain}}"
-          echo ""
-          echo "=== VALIDATION VERDICT ==="
-          echo "{{validation_report}}" | head -20
+          VERDICT=$(echo "{{critic_report}}" | grep "^VERDICT:" | awk '{print $2}' | tr -d '[:space:]')
+          if [ -z "$VERDICT" ]; then VERDICT="FAIL"; fi
+          if [ "$VERDICT" = "PASS" ]; then NEEDS_REVISION="false"; else NEEDS_REVISION="true"; fi
+          echo "{\"verdict\": \"$VERDICT\", \"needs_revision\": $NEEDS_REVISION}"
+        parse_json: true
+        output: "verdict_status"
+
+      - id: "refinement-loop"
+        while_condition: "{{verdict_status.needs_revision}}"
+        break_when: "not {{verdict_status.needs_revision}}"
+        max_iterations: 3
+        steps:
+          - id: "refine-build"
+            agent: "zerovector:builder"
+            prompt: |
+              Revise the artifact based on the Critic's report.
+              Address every FAIL and CONDITIONAL_PASS issue listed.
+              Do not change anything the Critic approved.
+
+              Critic Report (issues to fix):
+              {{critic_report}}
+
+              Specification (source of truth):
+              {{approved_spec}}
+
+              Intent Document:
+              {{intent_document}}
+
+              Domain: {{domain}}
+              Project path: {{project_path}}
+
+              Use your structured Output Contract format when reporting completion.
+            output: "build_result"
+
+          - id: "re-review"
+            agent: "zerovector:critic"
+            prompt: |
+              Re-validate the revised artifact using your two-pass protocol.
+
+              Pass 1 — Spec/Intent Compliance
+              Pass 2 — Quality/Robustness
+
+              Previous Critic Report (issues that were flagged):
+              {{critic_report}}
+
+              Intent Document:
+              {{intent_document}}
+
+              Specification:
+              {{approved_spec}}
+
+              Revised Build Result:
+              {{build_result}}
+
+              Domain: {{domain}}
+              Project path: {{project_path}}
+
+              End your report with the machine-readable verdict on its own line:
+              VERDICT: PASS|CONDITIONAL_PASS|FAIL
+            output: "critic_report"
+
+          - id: "re-parse-verdict"
+            type: "bash"
+            command: |
+              VERDICT=$(echo "{{critic_report}}" | grep "^VERDICT:" | awk '{print $2}' | tr -d '[:space:]')
+              if [ -z "$VERDICT" ]; then VERDICT="FAIL"; fi
+              if [ "$VERDICT" = "PASS" ]; then NEEDS_REVISION="false"; else NEEDS_REVISION="true"; fi
+              echo "{\"verdict\": \"$VERDICT\", \"needs_revision\": $NEEDS_REVISION}"
+            parse_json: true
+            output: "verdict_status"
+
+      - id: "build-summary"
+        type: "bash"
+        command: |
+          echo "=== BUILD + REVIEW SUMMARY ==="
+          echo "Project: {{project_path}} | Domain: {{domain}}"
+          echo "Final critic verdict: {{verdict_status.verdict}}"
           echo ""
           echo "=== ARTIFACTS ==="
-          echo "Intent:  {{paths.intent_path}}"
-          echo "Spec:    {{paths.spec_path}}"
-        output: "ship_summary"
+          echo "Intent: {{paths.intent_path}}"
+          echo "Spec:   {{paths.spec_path}}"
+        output: "build_summary"
 
-    # APPROVAL GATE 2: Choose ship action
+    # APPROVAL GATE 2: Human reviews artifact + critic verdict before verification
     approval:
       required: true
       prompt: |
-        ## Build Complete — Choose Ship Action
+        ## GATE 2 — Review Build Before Verification
 
-        {{ship_summary}}
+        {{build_summary}}
 
         ---
-        Full validation report:
-        {{validation_report}}
+        Critic verdict: **{{verdict_status.verdict}}**
 
-        Choose:
-        - **APPROVE** — Shipper delivers the artifact
-        - **DENY** — Stop here, discard
+        Full critic report:
+        {{critic_report}}
+
+        **APPROVE** to proceed to final verification.
+        **DENY** to stop here and discard.
 
   # ==========================================================================
-  # STAGE 3: Ship
-  # Package, commit, document, deliver
+  # STAGE 3: VERIFY ARTIFACT
+  # Evidence-first independent verification — confirms artifact is ship-ready
+  # Standalone equivalent: zerovector:recipes/verify-artifact.yaml
   # ==========================================================================
-  - name: "ship"
+  - name: "verify-artifact"
     steps:
-      # Parse the approval action
-      - id: "determine-action"
+      - id: "gather-evidence"
+        agent: "zerovector:critic"
+        prompt: |
+          Run an evidence-first verification pass on this artifact.
+
+          Do NOT rely on the prior review — independently confirm with fresh evidence:
+          1. Run available test suites; capture and report actual output
+          2. Run linters / type checkers where applicable; report results
+          3. Check every Success Criterion in the Specification — met or unmet with evidence
+          4. Confirm files exist at all specified paths
+          5. Verify no debug artifacts, TODOs, or temporary code remain
+          6. Confirm integration points are intact
+
+          Intent Document:
+          {{intent_document}}
+
+          Specification:
+          {{approved_spec}}
+
+          Prior Critic Report:
+          {{critic_report}}
+
+          Domain: {{domain}}
+          Project path: {{project_path}}
+
+          Produce a Verification Evidence Report with:
+          - Evidence collected (actual command output, not assertions)
+          - Success criteria status (each criterion: MET / UNMET with evidence)
+          - Remaining risks (if any)
+          - Final recommendation: SHIP | HOLD
+
+          End your report with the machine-readable verdict on its own line:
+          VERDICT: PASS|CONDITIONAL_PASS|FAIL
+        output: "verification_report"
+
+      - id: "parse-final-verdict"
         type: "bash"
         command: |
-          ACTION="{{_approval_message}}"
-          if [ -z "$ACTION" ]; then
-            ACTION="ship"
-          fi
-          echo "{\"action\": \"${ACTION}\"}"
+          VERDICT=$(echo "{{verification_report}}" | grep "^VERDICT:" | awk '{print $2}' | tr -d '[:space:]')
+          if [ -z "$VERDICT" ]; then VERDICT="FAIL"; fi
+          echo "{\"final_verdict\": \"$VERDICT\"}"
         parse_json: true
-        output: "ship_action"
+        output: "final_verdict"
 
-      # Ship the artifact
-      - id: "ship-artifact"
+    # APPROVAL GATE 3: Human chooses finish action
+    approval:
+      required: true
+      prompt: |
+        ## GATE 3 — Verification Complete — Choose Finish Action
+
+        **Verification verdict: {{final_verdict.final_verdict}}**
+
+        {{verification_report}}
+
+        ---
+        Choose your finish action:
+        - **APPROVE** with message **merge** — merge to main (or default) branch
+        - **APPROVE** with message **pr** — open a pull request
+        - **APPROVE** with message **keep** — keep on current branch, no merge
+        - **DENY** — discard artifact, do not ship
+
+  # ==========================================================================
+  # STAGE 4: FINISH ARTIFACT
+  # Execute the chosen finish action and produce delivery report
+  # Standalone equivalent: zerovector:recipes/finish-artifact.yaml
+  # ==========================================================================
+  - name: "finish-artifact"
+    steps:
+      - id: "parse-finish-action"
+        type: "bash"
+        command: |
+          ACTION=$(echo "{{_approval_message}}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+          case "$ACTION" in
+            merge|pr|keep) ;;
+            *) ACTION="keep" ;;
+          esac
+          echo "{\"action\": \"$ACTION\"}"
+        parse_json: true
+        output: "finish_action"
+
+      - id: "execute-finish"
         agent: "zerovector:shipper"
         prompt: |
-          Ship this validated artifact.
+          Execute this finish action for the validated artifact.
 
-          Action: {{ship_action.action}}
+          Finish Action: {{finish_action.action}}
 
-          Validation Report:
-          {{validation_report}}
+          Action semantics:
+          - merge: clean commit history → merge current branch into main (or default branch)
+          - pr:    clean commit history → open a pull request with conventional title + description
+          - keep:  commit cleanly on current branch; no merge, no PR
+          - discard: this should not reach here; if it does, stop and report
+
+          Verification Report:
+          {{verification_report}}
+
+          Critic Report:
+          {{critic_report}}
 
           Intent Document:
           {{intent_document}}
@@ -273,15 +430,10 @@ stages:
           Domain: {{domain}}
           Project path: {{project_path}}
 
-          Deliver with:
-          1. Clean final state (no debug artifacts)
-          2. Proper commit(s) with conventional commit format
-          3. Relevant documentation updates
-          4. Delivery report: what shipped, where it lives, how to use it
+          Use your Delivery Report output format. Include the finish action taken.
         output: "delivery_report"
 
-      # Final pipeline summary
-      - id: "final-summary"
+      - id: "pipeline-summary"
         type: "bash"
         command: |
           echo "============================================"
@@ -290,11 +442,12 @@ stages:
           echo ""
           echo "Intent:  {{intent}}"
           echo "Domain:  {{domain}}"
-          echo "Action:  {{ship_action.action}}"
+          echo "Action:  {{finish_action.action}}"
+          echo "Verdict: {{final_verdict.final_verdict}}"
           echo ""
           echo "Pipeline artifacts:"
-          echo "  Intent:  {{paths.intent_path}}"
-          echo "  Spec:    {{paths.spec_path}}"
+          echo "  Intent: {{paths.intent_path}}"
+          echo "  Spec:   {{paths.spec_path}}"
           echo ""
           echo "{{delivery_report}}"
           echo ""

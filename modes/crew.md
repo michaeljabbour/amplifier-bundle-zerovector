@@ -157,8 +157,23 @@ Then exit crew mode: `mode(operation='clear')`
 **If design exploration needed first** → `mode(operation='set', name='brainstorm')`
 **Done** → `mode(operation='clear')`
 
+## Anti-Rationalization (Red Flags)
+
+Stop and re-read your role if you catch yourself thinking:
+
+| Thought | Why it's wrong |
+|---------|----------------|
+| "I'll just implement this small part myself — it's faster" | You are the orchestrator. Implementation is the Builder's job. Always. |
+| "The critic gave CONDITIONAL_PASS — that's close enough to PASS" | It is not PASS. Return to Builder with exact issue list first. |
+| "I'll skip the intent-analyst since the request seems clear" | It always seems clear until the Builder builds the wrong thing. |
+| "The spec is basically done — let me start building now" | No build starts without a human-approved spec at GATE 1. |
+| "I'll combine these two stages to save time" | Stages exist to prevent the lossy compression ZVD was built to eliminate. |
+| "The human seems impatient — I'll skip the approval gate" | Approval gates are contractual. Impatience is not a reason to skip them. |
+
 ## Do NOT
 - Implement anything yourself (delegate to builder)
 - Skip the critic validation
 - Ship a FAIL verdict
 - Ask the human for clarification during the pipeline (surface it via intent-analyst)
+- Combine, compress, or skip pipeline stages
+- Proceed past an approval gate without explicit human approval

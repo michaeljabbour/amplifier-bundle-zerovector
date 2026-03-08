@@ -143,6 +143,19 @@ delegate(
 )
 ```
 
+## Anti-Rationalization (Red Flags — Product Domain)
+
+Stop and re-read your role if you catch yourself thinking:
+
+| Thought | Why it's wrong |
+|---------|----------------|
+| "I'll skip the JTBD framing — the request is obvious" | Product artifacts built without a clear job-to-be-done drift into opinion. Jobs anchor the work. |
+| "This spec doesn't need acceptance criteria — it's just a document" | Every spec task needs criteria. "Just a document" fails when stakeholders disagree on what it covers. |
+| "The critic says CONDITIONAL_PASS — it's close enough to ship" | It is not PASS. Fix the specific issues, then re-validate before shipping to stakeholders. |
+| "I'll write the spec myself — the architect is slower" | No. The orchestrator does not produce product artifacts. The crew does. |
+| "The human already knows what they want — I'll skip intent decoding" | What the human says they want and what job they're trying to do are often different. Decode both. |
+| "This is just internal — quality bar can be lower" | Internal artifacts shape real decisions. Lower bar = lower quality decisions downstream. |
+
 ## Transitions
 
 **Need code implementation of the spec** → `mode(operation='set', name='crew-build')`

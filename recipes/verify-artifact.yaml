@@ -1,0 +1,105 @@
+# Zero-Vector Verify Artifact — Standalone Sub-Recipe
+# Runs: evidence-first independent verification pass before the finish decision.
+#
+# This is distinct from the build review in build-and-review.yaml.
+# The Critic here starts fresh: re-runs checks, confirms evidence, does not assume prior review.
+#
+# Usage (standalone):
+#   amplifier run "execute zerovector:recipes/verify-artifact.yaml
+#                  with project_path='.' domain='build'"
+#
+# Approval Gate (1):
+#   After verification — human chooses finish action (merge / pr / keep / deny=discard)
+
+name: "verify-artifact"
+description: "Zero-Vector verification: evidence-first check before finish action"
+version: "0.2.0"
+author: "Zero-Vector Bundle"
+tags: ["workflow", "zero-vector", "verify", "evidence", "sub-recipe"]
+
+context:
+  domain: "general"       # build | product | platform | research | content | general
+  project_path: "."       # Project directory
+  intent_document: ""     # Intent Document from decode-intent (optional, enriches check)
+  specification: ""       # Specification Document (optional, provides success criteria)
+  critic_report: ""       # Prior critic report (optional, informs fresh check)
+  _approval_message: ""
+
+stages:
+  # ==========================================================================
+  # STAGE 1: EVIDENCE VERIFICATION
+  # Critic independently re-verifies artifact with fresh evidence
+  # ==========================================================================
+  - name: "verify"
+    steps:
+      - id: "gather-evidence"
+        agent: "zerovector:critic"
+        prompt: |
+          Run an evidence-first verification pass on this artifact.
+
+          Do NOT rely on prior review reports — independently confirm with fresh evidence:
+
+          1. Run available test suites; capture and report actual output (not assertions)
+          2. Run linters / type checkers where applicable; report actual results
+          3. Check every Success Criterion in the Specification — MET or UNMET with evidence
+          4. Confirm every file specified exists at its exact path
+          5. Verify no debug artifacts, stray TODOs, or temporary code remain
+          6. Confirm integration points are intact (imports resolve, dependencies present)
+          7. For documentation: verify all code examples are correct and runnable
+          8. For infrastructure: dry-run or validate configuration if possible
+
+          Intent Document (for success criteria context):
+          {{intent_document}}
+
+          Specification (source of success criteria):
+          {{specification}}
+
+          Prior Critic Report (for context only — do not rely on its conclusions):
+          {{critic_report}}
+
+          Domain: {{domain}}
+          Project path: {{project_path}}
+
+          Produce a Verification Evidence Report with these sections:
+          ## Evidence Collected
+          [Actual command output, not assertions]
+
+          ## Success Criteria Status
+          [Each criterion: MET / UNMET with specific evidence]
+
+          ## Remaining Risks
+          [Any risks that should be disclosed before shipping]
+
+          ## Recommendation
+          SHIP — all criteria met, no blocking risks
+          HOLD — one or more criteria unmet or blocking risk present
+
+          End your report with the machine-readable verdict on its own line:
+          VERDICT: PASS|CONDITIONAL_PASS|FAIL
+        output: "verification_report"
+
+      - id: "parse-verdict"
+        type: "bash"
+        command: |
+          VERDICT=$(echo "{{verification_report}}" | grep "^VERDICT:" | awk '{print $2}' | tr -d '[:space:]')
+          if [ -z "$VERDICT" ]; then VERDICT="FAIL"; fi
+          echo "{\"final_verdict\": \"$VERDICT\"}"
+        parse_json: true
+        output: "final_verdict"
+
+    # APPROVAL GATE: Human reviews verification and chooses finish action
+    approval:
+      required: true
+      prompt: |
+        ## Verification Complete — Choose Finish Action
+
+        **Verdict: {{final_verdict.final_verdict}}**
+
+        {{verification_report}}
+
+        ---
+        Choose your finish action:
+        - **APPROVE** with message **merge** — merge to main (or default) branch
+        - **APPROVE** with message **pr** — open a pull request
+        - **APPROVE** with message **keep** — keep on current branch, no merge
+        - **DENY** — discard artifact, do not ship

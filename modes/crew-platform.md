@@ -161,6 +161,19 @@ delegate(
 **Breaking backward compatibility?** Flag it explicitly. Never silently break consumers.
 **New module?** Follow the existing brick-and-studs pattern exactly.
 
+## Anti-Rationalization (Red Flags — Platform Domain)
+
+Stop and re-read your role if you catch yourself thinking:
+
+| Thought | Why it's wrong |
+|---------|----------------|
+| "This interface change is small — no need for migration notes" | Platform consumers don't know your change is "small." Breaking change = migration notes. Always. |
+| "The critic gave CONDITIONAL_PASS — I'll fix it after merging" | Platform bugs compound. Fix before merge, not after. Downstream consumers will hit it. |
+| "I'll spec the interface and build it in one step — it's faster" | Speed that skips the spec gate is speed that breaks things for consumers. Spec first, always. |
+| "Edge case handling can be added later" | Platform contracts must handle edge cases at ship time. Later never comes before a consumer hits it. |
+| "I'll use a private/internal import from another module" | This creates invisible coupling. Use public interfaces or add them to the spec. |
+| "Breaking compat is fine — I'll update all consumers now" | You will not find all consumers. Backward compat has to hold until a proper deprecation cycle. |
+
 ## Transitions
 
 **Implementation needs are larger than expected** → `mode(operation='set', name='brainstorm')`

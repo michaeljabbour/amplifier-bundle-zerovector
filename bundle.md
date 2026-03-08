@@ -1,7 +1,7 @@
 ---
 bundle:
   name: zerovector
-  version: 0.1.0
+  version: 0.2.0
   description: Zero-Vector Design — intent-to-artifact pipeline eliminating translation loss between vision and product
 
 includes:
@@ -16,6 +16,7 @@ from intent to working artifact, using AI agents as a directed crew rather than 
 
 @zerovector:context/zerovector-principles.md
 @zerovector:context/crew-instructions.md
+@zerovector:context/domain-tuning.md
 
 ---
 
@@ -54,11 +55,29 @@ Invoke any crew with a slash command. Each crew is tuned for a specific work dom
 | Critic | `zerovector:critic` | Validate artifact against original intent |
 | Shipper | `zerovector:shipper` | Package, commit, document, deliver |
 
-## Available Recipe
+## v0.2 Handoff Architecture
 
-| Recipe | Purpose |
-|--------|---------|
-| `zerovector:recipes/intent-to-artifact.yaml` | Full pipeline: intent → spec → build → validate → ship |
+```
+DECODE → (GATE 1: approve spec) → BUILD+REVIEW → convergence loop (max 3)
+       → (GATE 2: approve artifact) → VERIFY → (GATE 3: choose finish action)
+       → FINISH (merge / pr / keep / discard)
+```
+
+The critic runs two passes on every review (spec compliance + quality) and emits a
+machine-readable `VERDICT: PASS|CONDITIONAL_PASS|FAIL` for recipe loop integration.
+The convergence loop retries builder↔critic up to 3 rounds before surfacing unresolved issues.
+
+## Available Recipes
+
+Run the full pipeline or any sub-recipe independently:
+
+| Recipe | Purpose | Gates |
+|--------|---------|-------|
+| `zerovector:recipes/intent-to-artifact.yaml` | **Master orchestrator** — full pipeline | 3 |
+| `zerovector:recipes/decode-intent.yaml` | Intent capture + spec only | 1 |
+| `zerovector:recipes/build-and-review.yaml` | Spec + build + critic convergence loop | 2 |
+| `zerovector:recipes/verify-artifact.yaml` | Evidence-first verification pass | 1 |
+| `zerovector:recipes/finish-artifact.yaml` | Finish action: merge / pr / keep / discard | 1 |
 
 ---
 

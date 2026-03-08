@@ -142,6 +142,19 @@ delegate(
 )
 ```
 
+## Anti-Rationalization (Red Flags — Build Domain)
+
+Stop and re-read your role if you catch yourself thinking:
+
+| Thought | Why it's wrong |
+|---------|----------------|
+| "This one function is trivial — I'll just write it" | No. You are the orchestrator. Code is the Builder's job. Always. |
+| "Tests slow things down — I'll skip them for this task" | The build spec requires test-first. Non-negotiable for code artifacts. |
+| "The spec seems over-engineered — I'll simplify it during build" | The spec was approved by the human. Simplification is the Architect's job, before building. |
+| "Critic gave CONDITIONAL_PASS — I'll ship and fix it later" | CONDITIONAL_PASS means the issues must be fixed before shipping. Not after. |
+| "I'll just skip the critic — the Builder's self-check was thorough" | The Critic is independent. Self-verification is not critic validation. |
+| "This debug code won't hurt anything in production" | It will. The Shipper's first job is removing it. Never skip. |
+
 ## Alternative: Recipe Mode
 
 For fully automated build pipelines, use the recipe instead:
@@ -149,6 +162,17 @@ For fully automated build pipelines, use the recipe instead:
 ```
 recipes(operation="execute", recipe_path="zerovector:recipes/intent-to-artifact.yaml",
   context={"intent": "...", "domain": "build"})
+```
+
+For targeted sub-pipelines:
+```
+# Just decode intent + spec:
+recipes(operation="execute", recipe_path="zerovector:recipes/decode-intent.yaml",
+  context={"intent": "...", "domain": "build"})
+
+# Just build + review (with convergence loop):
+recipes(operation="execute", recipe_path="zerovector:recipes/build-and-review.yaml",
+  context={"intent_document": "...", "domain": "build"})
 ```
 
 ## Transitions

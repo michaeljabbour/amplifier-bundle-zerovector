@@ -1,0 +1,143 @@
+# Zero-Vector Finish Artifact — Standalone Sub-Recipe
+# Runs: parse finish action → Shipper executes → delivery report
+#
+# Supports 4 finish actions (passed via approval message or context):
+#   merge   — merge current branch into main (or default branch)
+#   pr      — open a pull request with conventional commit message
+#   keep    — commit cleanly on current branch, no merge
+#   discard — abort delivery; report and stop (do not ship)
+#
+# Usage (standalone — typically preceded by verify-artifact.yaml):
+#   amplifier run "execute zerovector:recipes/finish-artifact.yaml
+#                  with project_path='.' domain='build'"
+# Then APPROVE with message "merge" | "pr" | "keep" or DENY to discard.
+
+name: "finish-artifact"
+description: "Zero-Vector finish: execute merge / pr / keep / discard and produce delivery report"
+version: "0.2.0"
+author: "Zero-Vector Bundle"
+tags: ["workflow", "zero-vector", "finish", "ship", "deliver", "sub-recipe"]
+
+context:
+  domain: "general"         # build | product | platform | research | content | general
+  project_path: "."         # Project directory
+  intent_document: ""       # Intent Document (for delivery context)
+  specification: ""         # Specification Document (for delivery context)
+  verification_report: ""   # Verification Evidence Report (required for Shipper)
+  critic_report: ""         # Prior critic report (supplementary context)
+  _approval_message: ""     # Populated by engine: merge | pr | keep (DENY = discard)
+
+stages:
+  # ==========================================================================
+  # STAGE 1: CHOOSE FINISH ACTION
+  # Human selects the finish action via approval gate
+  # ==========================================================================
+  - name: "choose-action"
+    steps:
+      - id: "show-status"
+        type: "bash"
+        command: |
+          echo "=== FINISH ARTIFACT ==="
+          echo "Project: {{project_path}} | Domain: {{domain}}"
+          echo ""
+          echo "Available actions:"
+          echo "  merge   — merge current branch into main"
+          echo "  pr      — open a pull request"
+          echo "  keep    — commit cleanly, stay on branch"
+          echo "  DENY    — discard, do not ship"
+          echo ""
+          echo "Select your action by approving with the action name as the message."
+        output: "status_display"
+
+    approval:
+      required: true
+      prompt: |
+        ## Choose Finish Action
+
+        Project: {{project_path}} | Domain: {{domain}}
+
+        {{verification_report}}
+
+        ---
+        Choose your finish action:
+        - **APPROVE** with message **merge** — merge to main (or default) branch
+        - **APPROVE** with message **pr** — open a pull request
+        - **APPROVE** with message **keep** — keep on current branch, no merge
+        - **DENY** — discard artifact, do not ship
+
+  # ==========================================================================
+  # STAGE 2: EXECUTE FINISH
+  # Shipper executes the chosen action and produces a delivery report
+  # ==========================================================================
+  - name: "execute-finish"
+    steps:
+      - id: "parse-action"
+        type: "bash"
+        command: |
+          ACTION=$(echo "{{_approval_message}}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+          case "$ACTION" in
+            merge) DESC="Merge current branch into main (or default branch)" ;;
+            pr)    DESC="Open a pull request with conventional commit message" ;;
+            keep)  DESC="Commit cleanly on current branch; no merge or PR" ;;
+            *)     ACTION="keep"; DESC="Action not recognized — defaulting to keep" ;;
+          esac
+          echo "{\"action\": \"$ACTION\", \"description\": \"$DESC\"}"
+        parse_json: true
+        output: "finish_action"
+
+      - id: "execute-delivery"
+        agent: "zerovector:shipper"
+        prompt: |
+          Execute this finish action for the validated artifact.
+
+          Finish Action: {{finish_action.action}}
+          Description: {{finish_action.description}}
+
+          Action instructions:
+          - merge: Clean commit history (squash if needed) → merge to main or default branch.
+                   If merge fails (conflicts, protected branch, no remote), report clearly and fall back to keep.
+          - pr:    Clean commit history → push branch → open PR with conventional title + description.
+                   PR title format: "type(scope): what was built"
+                   If PR cannot be opened (no remote, CLI unavailable), report clearly and fall back to keep.
+          - keep:  Ensure all work is committed with a clean conventional commit message.
+                   No merge. No PR. Report what branch to find the work on.
+          - discard: This should not reach you. If it does, report and stop — do not commit anything.
+
+          Safety rules:
+          - Never force-push to a shared branch
+          - Never commit debug artifacts
+          - Report clearly if an action is not possible; always fall back to keep rather than failing silently
+
+          Verification Report:
+          {{verification_report}}
+
+          Critic Report:
+          {{critic_report}}
+
+          Intent Document:
+          {{intent_document}}
+
+          Specification:
+          {{specification}}
+
+          Domain: {{domain}}
+          Project path: {{project_path}}
+
+          Use your Delivery Report output format.
+          Include the finish action taken and the final commit hash or PR URL.
+        output: "delivery_report"
+
+      - id: "finish-summary"
+        type: "bash"
+        command: |
+          echo "============================================"
+          echo "  ZERO-VECTOR FINISH COMPLETE"
+          echo "============================================"
+          echo ""
+          echo "Domain:  {{domain}}"
+          echo "Action:  {{finish_action.action}}"
+          echo ""
+          echo "{{delivery_report}}"
+          echo ""
+          echo "============================================"
+        output: "final_output"

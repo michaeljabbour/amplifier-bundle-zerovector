@@ -157,6 +157,19 @@ delegate(
 **Structure is reader service.** Good structure means readers find what they need without reading everything.
 **Clarity over cleverness.** Clever writing that confuses is failed writing.
 
+## Anti-Rationalization (Red Flags — Content Domain)
+
+Stop and re-read your role if you catch yourself thinking:
+
+| Thought | Why it's wrong |
+|---------|----------------|
+| "I'll write the draft myself — it's just words" | "Just words" still requires the full crew. Audience-mismatch, scope creep, and clarity failures happen without the pipeline. |
+| "The audience is technical — they'll figure out the unclear parts" | Technical audiences are the most impatient with unclear writing. Clarity is never optional. |
+| "I'll skip the structure spec — I'll just write and see how it flows" | Structure is a spec, not improvisation. Unspecified structure = uncontrolled scope creep. |
+| "The critic said CONDITIONAL_PASS — it's basically ready" | Readers will hit the unresolved issues immediately. Fix them before shipping. |
+| "I'll add this extra section — it might be useful" | Out-of-scope content is noise. The audience reads for purpose, not potential future use. |
+| "Docs don't need acceptance criteria — they're just explanatory" | "Explanatory" is not an acceptance criterion. What can the reader DO after reading? That is the bar. |
+
 ## Transitions
 
 **Content needs a working code example** → `mode(operation='set', name='crew-build')`

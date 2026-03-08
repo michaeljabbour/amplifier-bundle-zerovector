@@ -1,0 +1,278 @@
+# Zero-Vector Build and Review — Standalone Sub-Recipe
+# Runs: architect spec → builder implements → critic validates (2-pass)
+#       → convergence loop (max 3 rounds if verdict is not PASS)
+#
+# Expects decoded context (intent_document + specification) from decode-intent.yaml
+# or passed directly as context variables.
+#
+# Usage (standalone):
+#   amplifier run "execute zerovector:recipes/build-and-review.yaml
+#                  with intent_document='...' specification='...' domain='build'"
+#
+# Approval Gates (2):
+#   1. After spec — approve spec before build (if producing spec fresh)
+#   2. After build+review — approve artifact before verification
+
+name: "build-and-review"
+description: "Zero-Vector build + review: spec → build → critic (2-pass) → convergence loop"
+version: "0.2.0"
+author: "Zero-Vector Bundle"
+tags: ["workflow", "zero-vector", "build", "review", "convergence", "sub-recipe"]
+
+context:
+  intent: ""            # Raw intent (for reference)
+  domain: "general"    # build | product | platform | research | content | general
+  project_path: "."    # Project directory
+  intent_document: ""  # Intent Document from decode-intent (required)
+  specification: ""    # Specification Document — if empty, architect produces one
+  spec_path: "."       # Where spec is saved (for reference)
+  _approval_message: ""
+
+stages:
+  # ==========================================================================
+  # STAGE 1: SPEC (optional — skipped if specification context is provided)
+  # Produces spec if not already available from decode-intent
+  # ==========================================================================
+  - name: "architect"
+    steps:
+      - id: "check-or-produce-spec"
+        agent: "zerovector:architect"
+        prompt: |
+          Review or produce a Specification Document for this build.
+
+          If a specification has been provided in context, review it for completeness
+          and confirm it is ready for the Builder. If no specification is provided,
+          produce one from the Intent Document.
+
+          Intent Document:
+          {{intent_document}}
+
+          Existing Specification (may be empty):
+          {{specification}}
+
+          Domain: {{domain}}
+          Project path: {{project_path}}
+
+          The specification must include:
+          - What We're Building (one paragraph)
+          - Structure (files/components with exact paths)
+          - Public Interface (domain-appropriate)
+          - Implementation Tasks (ordered, each: What / Files / Acceptance Criteria)
+          - Integration Points
+          - Error Handling / Edge Cases
+          - Success Criteria (measurable)
+          - What This Is NOT
+
+          Survey {{project_path}} for existing conventions.
+        output: "approved_spec"
+
+      - id: "spec-summary"
+        agent: "zerovector:architect"
+        prompt: |
+          Summarize this specification for build approval (10 lines max).
+
+          Specification:
+          {{approved_spec}}
+
+          Provide:
+          1. What artifact will be built (one sentence)
+          2. Task count and complexity
+          3. Key design decisions (3 bullets max)
+          4. Any open risks
+
+          End with: "Ready for Builder."
+        output: "spec_summary"
+
+    # APPROVAL GATE 1: Confirm spec before build
+    approval:
+      required: true
+      prompt: |
+        ## Spec Ready — Approve Before Build
+
+        {{spec_summary}}
+
+        ---
+        Spec path: {{spec_path}}
+
+        **APPROVE** to proceed to build.
+        **DENY** to stop here.
+
+  # ==========================================================================
+  # STAGE 2: BUILD + REVIEW WITH CONVERGENCE LOOP
+  # Builder implements → Critic validates (2-pass) → loop up to 3 rounds
+  # ==========================================================================
+  - name: "build-and-review"
+    steps:
+      - id: "build-artifact"
+        agent: "zerovector:builder"
+        prompt: |
+          Build the artifact from this approved Specification.
+
+          Specification:
+          {{approved_spec}}
+
+          Intent Document:
+          {{intent_document}}
+
+          Domain: {{domain}}
+          Project path: {{project_path}}
+
+          Instructions:
+          - Implement each task in spec order
+          - Code: test-first, run checks after each task, commit atomically
+          - Documents: follow section structure exactly, write for stated audience
+          - Configuration: validate with dry-run if possible
+          - No scope creep — stop at spec boundaries
+
+          Use your structured Output Contract format when reporting completion.
+        output: "build_result"
+        on_error: "continue"
+
+      - id: "initial-review"
+        agent: "zerovector:critic"
+        prompt: |
+          Validate this artifact using your two-pass protocol.
+
+          Pass 1 — Spec/Intent Compliance:
+            Does every task meet its acceptance criteria?
+            Does the artifact match the Intent Document outcome?
+            Is scope respected (nothing missing, nothing extra)?
+
+          Pass 2 — Quality/Robustness:
+            Run tests, linters, type checks where applicable.
+            Check for scope creep, debug artifacts, missing edge cases.
+            Domain-appropriate quality standard (code/docs/config/research).
+
+          Intent Document:
+          {{intent_document}}
+
+          Specification:
+          {{approved_spec}}
+
+          Build Result:
+          {{build_result}}
+
+          Domain: {{domain}}
+          Project path: {{project_path}}
+
+          End your report with the machine-readable verdict on its own line:
+          VERDICT: PASS|CONDITIONAL_PASS|FAIL
+        output: "critic_report"
+
+      - id: "parse-initial-verdict"
+        type: "bash"
+        command: |
+          VERDICT=$(echo "{{critic_report}}" | grep "^VERDICT:" | awk '{print $2}' | tr -d '[:space:]')
+          if [ -z "$VERDICT" ]; then VERDICT="FAIL"; fi
+          if [ "$VERDICT" = "PASS" ]; then NEEDS_REVISION="false"; else NEEDS_REVISION="true"; fi
+          echo "{\"verdict\": \"$VERDICT\", \"needs_revision\": $NEEDS_REVISION}"
+        parse_json: true
+        output: "verdict_status"
+
+      # Convergence loop: runs only when verdict is not PASS, up to 3 times
+      - id: "refinement-loop"
+        while_condition: "{{verdict_status.needs_revision}}"
+        break_when: "not {{verdict_status.needs_revision}}"
+        max_iterations: 3
+        steps:
+          - id: "refine-build"
+            agent: "zerovector:builder"
+            prompt: |
+              Revise the artifact based on the Critic's report.
+              Address every FAIL and CONDITIONAL_PASS issue listed.
+              Do not change anything the Critic approved.
+
+              Critic Report (issues to fix):
+              {{critic_report}}
+
+              Specification (source of truth):
+              {{approved_spec}}
+
+              Intent Document:
+              {{intent_document}}
+
+              Domain: {{domain}}
+              Project path: {{project_path}}
+
+              Use your structured Output Contract format when reporting completion.
+            output: "build_result"
+
+          - id: "re-review"
+            agent: "zerovector:critic"
+            prompt: |
+              Re-validate the revised artifact using your two-pass protocol.
+
+              Pass 1 — Spec/Intent Compliance
+              Pass 2 — Quality/Robustness
+
+              Focus especially on the issues from the previous report.
+              Confirm each one is resolved or explain why it is not.
+
+              Previous Critic Report (issues that were flagged):
+              {{critic_report}}
+
+              Intent Document:
+              {{intent_document}}
+
+              Specification:
+              {{approved_spec}}
+
+              Revised Build Result:
+              {{build_result}}
+
+              Domain: {{domain}}
+              Project path: {{project_path}}
+
+              End your report with the machine-readable verdict on its own line:
+              VERDICT: PASS|CONDITIONAL_PASS|FAIL
+            output: "critic_report"
+
+          - id: "re-parse-verdict"
+            type: "bash"
+            command: |
+              VERDICT=$(echo "{{critic_report}}" | grep "^VERDICT:" | awk '{print $2}' | tr -d '[:space:]')
+              if [ -z "$VERDICT" ]; then VERDICT="FAIL"; fi
+              if [ "$VERDICT" = "PASS" ]; then NEEDS_REVISION="false"; else NEEDS_REVISION="true"; fi
+              echo "{\"verdict\": \"$VERDICT\", \"needs_revision\": $NEEDS_REVISION}"
+            parse_json: true
+            output: "verdict_status"
+
+      # After loop: surface unresolved issues if loop exhausted without PASS
+      - id: "loop-outcome-report"
+        type: "bash"
+        command: |
+          VERDICT="{{verdict_status.verdict}}"
+          if [ "$VERDICT" = "PASS" ]; then
+            echo "{\"resolved\": true, \"summary\": \"Convergence achieved: artifact passed review.\"}"
+          else
+            echo "{\"resolved\": false, \"summary\": \"Loop exhausted after 3 rounds. Verdict is ${VERDICT}. Human review required.\"}"
+          fi
+        parse_json: true
+        output: "loop_outcome"
+
+      - id: "build-review-summary"
+        type: "bash"
+        command: |
+          echo "=== BUILD + REVIEW SUMMARY ==="
+          echo "Project: {{project_path}} | Domain: {{domain}}"
+          echo "Final verdict: {{verdict_status.verdict}}"
+          echo "Loop resolved: {{loop_outcome.resolved}}"
+          echo "{{loop_outcome.summary}}"
+        output: "build_review_summary"
+
+    # APPROVAL GATE 2: Human reviews artifact + critic verdict
+    approval:
+      required: true
+      prompt: |
+        ## Build + Review Complete
+
+        {{build_review_summary}}
+
+        ---
+        Final critic verdict: **{{verdict_status.verdict}}**
+
+        Full critic report:
+        {{critic_report}}
+
+        **APPROVE** to proceed to verification.
+        **DENY** to stop here.
