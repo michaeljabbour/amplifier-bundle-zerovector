@@ -104,7 +104,7 @@ class TestPreservedContent:
 
     def test_iron_law_no_scope_expansion(self, builder_body: str):
         body = builder_body.lower()
-        assert "scope" in body and "expansion" in body or "scope creep" in body, (
+        assert ("scope" in body and "expansion" in body) or "scope creep" in body, (
             "Must preserve 'No silent scope expansion' iron law"
         )
 
