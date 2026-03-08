@@ -42,11 +42,6 @@ def _load_body() -> str:
     return match.group(1)
 
 
-def _load_full() -> str:
-    """Return the full file content."""
-    return CRITIC_PATH.read_text()
-
-
 # ---------------------------------------------------------------------------
 # AC-1: File exists at agents/critic.md with updated content
 # ---------------------------------------------------------------------------
@@ -98,7 +93,7 @@ class TestFidelityAssessmentProtocol:
 
     def test_lenses_scored_simultaneously(self):
         body = _load_body().lower()
-        assert "simultaneous" in body or "all" in body and "lenses" in body, (
+        assert "simultaneous" in body or ("all" in body and "lenses" in body), (
             "Protocol must indicate all lenses are scored simultaneously"
         )
 
@@ -194,7 +189,7 @@ class TestStep6UpdateFidelityState:
 
     def test_step_6_mentions_fidelity_state(self):
         body = _load_body().lower()
-        assert "fidelity state" in body or "fidelity" in body, (
+        assert "fidelity state" in body or "update fidelity" in body, (
             "Step 6 must reference updating fidelity state"
         )
 
@@ -269,7 +264,7 @@ class TestPreservedContent:
 
     def test_convergence_max_rounds(self):
         body = _load_body()
-        assert "3" in body, "Must mention max 3 rounds in convergence loop"
+        assert "3 rounds" in body, "Must mention max 3 rounds in convergence loop"
 
 
 # ---------------------------------------------------------------------------
