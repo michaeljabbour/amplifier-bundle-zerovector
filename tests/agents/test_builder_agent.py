@@ -135,3 +135,9 @@ class TestPreservedContent:
     def test_handoff_to_critic(self, builder_body: str):
         body = builder_body.lower()
         assert "critic" in body, "Must preserve handoff to Critic"
+
+    def test_domain_specific_standards_preserved(self, builder_body: str):
+        body = builder_body.lower()
+        assert "domain" in body and "standards" in body, (
+            "Must preserve domain-specific build standards table"
+        )
