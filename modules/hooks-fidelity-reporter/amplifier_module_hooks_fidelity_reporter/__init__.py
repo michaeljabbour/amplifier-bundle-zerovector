@@ -91,14 +91,15 @@ class Symbols:
 _BAR_WIDTH = 10  # Characters in a per-lens progress bar
 _BOX_WIDTH = 60  # Visible width inside the box borders
 
-# Ordered lens labels — padded to equal visual width for alignment
+# Ordered lens labels — ljust'd at render time to the longest label width.
 _LENS_LABELS: dict[str, str] = {
     "intent_clarity": "Intent Clarity",
-    "specification": "Specification ",
+    "specification": "Specification",
     "implementation": "Implementation",
-    "quality": "Quality       ",
+    "quality": "Quality",
     "ship_readiness": "Ship-Readiness",
 }
+_LABEL_WIDTH = max(len(v) for v in _LENS_LABELS.values())
 
 
 # ---------------------------------------------------------------------------
@@ -193,7 +194,8 @@ class FidelityReporter:
                 else ""
             )
 
-            content = f" {label} {bar}  {score_str}{gap_marker}"
+            padded_label = label.ljust(_LABEL_WIDTH)
+            content = f" {padded_label} {bar}  {score_str}{gap_marker}"
             padded = _pad_to_width(content, _BOX_WIDTH)
             lines.append(
                 f"{Colors.DIM_GRAY}{Symbols.V}{Colors.RESET}{padded}{Colors.DIM_GRAY}{Symbols.V}{Colors.RESET}"

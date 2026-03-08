@@ -352,7 +352,7 @@ class TestMount:
         await mount(coordinator, config={"priority": 10})
         # Each call's kwargs should include priority=10
         for call_args in coordinator.hooks.register.call_args_list:
-            assert call_args[1].get("priority") == 10 or call_args[0][2] == 10
+            assert call_args.kwargs["priority"] == 10
 
     @pytest.mark.asyncio
     async def test_tolerates_registration_failure(self):
