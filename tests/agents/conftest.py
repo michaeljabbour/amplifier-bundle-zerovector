@@ -58,3 +58,33 @@ def architect_frontmatter(architect_path: Path) -> dict[str, Any]:
 @pytest.fixture(scope="module")
 def architect_body(architect_path: Path) -> str:
     return load_agent_body(architect_path)
+
+
+@pytest.fixture(scope="module")
+def builder_path() -> Path:
+    return AGENTS_DIR / "builder.md"
+
+
+@pytest.fixture(scope="module")
+def builder_frontmatter(builder_path: Path) -> dict[str, Any]:
+    return load_agent_frontmatter(builder_path)
+
+
+@pytest.fixture(scope="module")
+def builder_body(builder_path: Path) -> str:
+    return load_agent_body(builder_path)
+
+
+@pytest.fixture(scope="module")
+def shipper_path() -> Path:
+    return AGENTS_DIR / "shipper.md"
+
+
+@pytest.fixture(scope="module")
+def shipper_frontmatter(shipper_path: Path) -> dict[str, Any]:
+    return load_agent_frontmatter(shipper_path)
+
+
+@pytest.fixture(scope="module")
+def shipper_body(shipper_path: Path) -> str:
+    return load_agent_body(shipper_path)
