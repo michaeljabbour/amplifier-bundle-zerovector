@@ -1,0 +1,39 @@
+bundle:
+  name: fidelity-behavior
+  version: 0.3.0
+  description: |
+    Universal fidelity diagnostic capability for any Amplifier session.
+
+    Provides five concurrent lenses that continuously evaluate session health:
+    intent fidelity, spec fidelity, process fidelity, artifact fidelity, and
+    communication fidelity. Each lens scores independently, producing a
+    composite fidelity state available via the zerovector.fidelity_state
+    capability.
+
+    Includes:
+    - Live ANSI dashboard rendered after every assistant turn
+    - Ephemeral routing advice surfaced when drift is detected
+    - update_fidelity tool for programmatic state updates
+    - Fidelity-aware critic agent for two-pass validation
+    - Fidelity framework context for lens definitions and scoring rubrics
+
+    Compose onto any bundle for continuous fidelity monitoring.
+
+    includes:
+      - bundle: zerovector:behaviors/fidelity
+
+hooks:
+  - module: hooks-fidelity-reporter
+    source: 'zerovector:modules/hooks-fidelity-reporter'
+
+tools:
+  - module: tool-fidelity-state
+    source: 'zerovector:modules/tool-fidelity-state'
+
+agents:
+  include:
+    - zerovector:critic
+
+context:
+  include:
+    - zerovector:context/fidelity-framework.md
