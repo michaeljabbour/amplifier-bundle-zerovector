@@ -19,6 +19,7 @@ from pathlib import Path
 import pytest
 
 MODES_DIR = Path(__file__).resolve().parents[2] / "modes"
+CREW_AGENTS = ["intent-analyst", "architect", "builder", "critic", "shipper"]
 
 
 # ---------------------------------------------------------------------------
@@ -126,10 +127,7 @@ class TestBuildConvergenceLoop:
 class TestBuildLensesAndAgents:
     """All five agents must be referenced."""
 
-    @pytest.mark.parametrize(
-        "agent",
-        ["intent-analyst", "architect", "builder", "critic", "shipper"],
-    )
+    @pytest.mark.parametrize("agent", CREW_AGENTS)
     def test_agent_referenced(self, crew_build_lower: str, agent: str):
         assert agent in crew_build_lower, f"Missing agent reference: {agent}"
 
@@ -291,10 +289,7 @@ class TestProductConvergenceLoop:
 class TestProductLensesAndAgents:
     """All five agents must be referenced."""
 
-    @pytest.mark.parametrize(
-        "agent",
-        ["intent-analyst", "architect", "builder", "critic", "shipper"],
-    )
+    @pytest.mark.parametrize("agent", CREW_AGENTS)
     def test_agent_referenced(self, crew_product_lower: str, agent: str):
         assert agent in crew_product_lower, f"Missing agent reference: {agent}"
 
