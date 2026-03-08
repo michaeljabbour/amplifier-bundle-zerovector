@@ -1,0 +1,35 @@
+bundle:
+  name: zerovector-crew
+  version: 0.3.0
+  description: >
+    Full Zero-Vector Design crew: 5 agents, 6 domain-tuned modes,
+    fidelity convergence orchestration, and the universal fidelity layer.
+    Includes the extractable fidelity behavior transitively.
+
+includes:
+  - bundle: zerovector:behaviors/fidelity
+
+hooks:
+  - module: hooks-mode
+    source: "modes:modules/hooks-mode"
+    config:
+      search_paths: ["@zerovector:modes"]
+
+tools:
+  - module: tool-mode
+    source: "modes:modules/tool-mode"
+    config:
+      gate_policy: "warn"
+
+agents:
+  include:
+    - zerovector:intent-analyst
+    - zerovector:architect
+    - zerovector:builder
+    - zerovector:shipper
+
+context:
+  include:
+    - zerovector:context/crew-instructions.md
+    - zerovector:context/domain-tuning.md
+    - modes:context/modes-instructions.md
