@@ -57,13 +57,14 @@ class TestOldPipelineRemoved:
 
     def test_no_pipeline_keyword_in_critical(self, crew_mode_content: str):
         """The CRITICAL section should not describe a 'pipeline'."""
-        # Extract the CRITICAL block
-        if "<CRITICAL>" in crew_mode_content and "</CRITICAL>" in crew_mode_content:
-            start = crew_mode_content.index("<CRITICAL>")
-            end = crew_mode_content.index("</CRITICAL>") + len("</CRITICAL>")
-            critical_block = crew_mode_content[start:end]
-            assert "Pipeline:" not in critical_block
-            assert "pipeline stage" not in critical_block.lower()
+        # Verify the CRITICAL block exists, then extract and check it
+        assert "<CRITICAL>" in crew_mode_content, "Missing <CRITICAL> block"
+        assert "</CRITICAL>" in crew_mode_content, "Missing </CRITICAL> block"
+        start = crew_mode_content.index("<CRITICAL>")
+        end = crew_mode_content.index("</CRITICAL>") + len("</CRITICAL>")
+        critical_block = crew_mode_content[start:end]
+        assert "Pipeline:" not in critical_block
+        assert "pipeline stage" not in critical_block.lower()
 
     def test_no_stage_numbered_arrows(self, crew_mode_content: str):
         """Should not have '1. zerovector:intent-analyst →' style pipeline."""
@@ -192,8 +193,13 @@ class TestAntiRationalization:
 
     def test_fidelity_aware_anti_patterns(self, crew_mode_lower: str):
         """At least one anti-pattern should reference fidelity concepts."""
-        # Should reference fidelity-related concepts in the anti-patterns
-        assert "fidelity" in crew_mode_lower
+        # Scope the check to the Anti-Rationalization section specifically
+        assert "anti-rationalization" in crew_mode_lower, (
+            "Missing Anti-Rationalization section"
+        )
+        section_start = crew_mode_lower.index("anti-rationalization")
+        anti_rat_section = crew_mode_lower[section_start:]
+        assert "fidelity" in anti_rat_section
 
 
 # ---------------------------------------------------------------------------

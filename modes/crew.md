@@ -96,6 +96,7 @@ delegate(
 Present the initial fidelity state to the human. Wait for approval to proceed.
 
 ### Convergence Loop
+<!-- See crew-instructions.md for concrete delegation patterns -->
 
 Read the priority gap from the assessment. Route to the agent that serves
 the weakest lens:
