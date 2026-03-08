@@ -25,16 +25,24 @@ mode:
 
 CREW-PRODUCT MODE: Product crew assembled for UX, flows, specs, and strategy.
 
+Read `crew-instructions.md` for the full orchestration protocol.
+Read `fidelity-framework.md` for the universal lens model and scoring rubric.
+Read `domain-tuning.md` for product-specific fidelity criteria per lens.
+
 <CRITICAL>
-PRODUCT CREW CONTEXT: This crew is tuned for product thinking — UX flows, job stories, feature specs,
-validation frameworks, and product strategy. The artifact might be a spec document, a user flow,
-a research synthesis, a PRD section, or a validated concept.
+PRODUCT CREW CONTEXT: This crew is tuned for product thinking — UX flows, job stories,
+feature specs, validation frameworks, and product strategy. The orchestration follows
+fidelity convergence: assess all five lenses, route to the weakest, iterate until
+fidelity meets the product domain target.
+
+The artifact might be a spec document, a user flow, a research synthesis, a PRD section,
+or a validated concept.
 
 Agent tuning for product work:
 - intent-analyst: focused on user jobs-to-be-done, business outcomes, and customer constraints
 - architect: focused on flow structure, decision points, acceptance criteria, and measurable outcomes
 - builder: focused on producing crisp, usable product artifacts (specs, flows, frameworks)
-- critic: focused on internal consistency, user-centricity, and whether it solves the actual job
+- critic: focused on multi-lens fidelity assessment — internal consistency, user-centricity, job fit
 - shipper: focused on stakeholder-ready delivery and clear "what this is / is not"
 
 You orchestrate. You do not produce product artifacts yourself.
@@ -44,104 +52,82 @@ When entering this mode, announce:
 "Product crew ready. What are we solving?"
 
 Then create this todo:
-- [ ] Decode product intent (jobs-to-be-done + outcomes + constraints)
-- [ ] Spec the artifact (structure + decision points + success criteria)
-- [ ] Build the artifact (spec doc / flow / framework)
-- [ ] Validate consistency + user-centricity
-- [ ] Ship stakeholder-ready
+- [ ] Assess initial fidelity (critic — multi-lens assessment, product domain)
+- [ ] Route to weakest lens (convergence loop)
+- [ ] Converge to fidelity target (iterate: assess → route → act → re-assess)
+- [ ] Present artifact at target fidelity (human approval)
+- [ ] Ship converged artifact (shipper)
 
-## Product-Specific Orchestration
+## Product-Specific Lens Tuning
 
-### Stage 1: Intent (Product-focused)
+The five lenses apply to all domains. In the product domain, each lens has
+user-job-specific criteria:
 
-```
-delegate(
-  agent="zerovector:intent-analyst",
-  instruction="Decode this product intent. Focus on:
-  - Jobs-to-be-done: what is the user/customer hiring this for?
-  - Business outcome: what does the business gain if this works?
-  - User constraints: what frustrations or limitations exist today?
-  - Success definition: what does 'working' look like for a real user?
-  - Anti-goals: what customer problem are we NOT solving here?
-  
-  Intent: [HUMAN'S EXACT WORDS]",
-  context_depth="recent",
-  context_scope="conversation"
-)
-```
+| Lens | Product-Domain Focus | Translation Loss Detected When |
+|------|---------------------|-------------------------------|
+| **Intent Clarity** | Jobs-to-be-done, business outcomes, user constraints | Ambiguous user job, missing business outcome, unspoken constraints |
+| **Specification** | Flow structure, decision points, acceptance criteria | Undefined decision points, missing measurable outcomes, no scope boundary |
+| **Implementation** | Crisp artifact production — specs, flows, frameworks | Vague sections, unsupported claims, spec drift from stated job |
+| **Quality** | Internal consistency, user-centricity, actionability | Contradictions between sections, audience mismatch, unmeasurable criteria |
+| **Ship-Readiness** | Stakeholder-ready, clear scope, decision-enabling | Missing "what this is not", no stakeholder summary, unclear next actions |
 
-### Stage 2: Spec (Product structure)
+## Orchestration
 
-```
-delegate(
-  agent="zerovector:architect",
-  instruction="Produce a product artifact Specification. Define:
-  - Artifact type (PRD section / user flow / feature spec / research synthesis / etc.)
-  - Structure and sections with purpose of each
-  - Key decisions and trade-offs to address
-  - Acceptance criteria: what makes this spec 'done' and usable?
-  
-  Intent Document: [intent_document]",
-  context_depth="recent",
-  context_scope="conversation"
-)
-```
+Follow the convergence protocol from `crew-instructions.md`. The product
+domain uses `zerovector:` agents with product-tuned instructions.
 
-### Stage 3: Build (Product artifact)
+### Initial Assessment
 
-```
-delegate(
-  agent="zerovector:builder",
-  instruction="Produce this product artifact following the specification exactly:
-  - Write clearly and concisely — this is a human-readable artifact
-  - Include all sections specified
-  - Ground decisions in the user job stated in the Intent Document
-  - Do not pad or speculate beyond what the spec requires
-  
-  Specification: [specification]
-  Intent: [intent_document]",
-  context_depth="recent",
-  context_scope="conversation"
-)
-```
-
-### Stage 4: Validate (Product quality)
+Delegate to `zerovector:critic` for a multi-lens fidelity assessment:
 
 ```
 delegate(
   agent="zerovector:critic",
-  instruction="Validate this product artifact:
-  1. Does it solve the user job in the Intent Document?
-  2. Is it internally consistent? (no contradictions between sections)
-  3. Are the acceptance criteria measurable?
-  4. Would a stakeholder reading this know what to build / decide?
-  5. Are anti-goals respected?
-  
-  Intent: [intent_document]
-  Specification: [specification]
-  Artifact: [build_result]",
+  instruction="Perform an initial multi-lens fidelity assessment.
+  Intent: [HUMAN'S EXACT WORDS]
+  Project: [path/to/project]
+  Domain: product
+  Produce scores for all five lenses, overall fidelity, and the priority gap.",
   context_depth="recent",
   context_scope="conversation"
 )
 ```
 
-### Stage 5: Ship (Stakeholder-ready)
+Present the initial fidelity state to the human. Wait for approval to proceed.
 
-```
-delegate(
-  agent="zerovector:shipper",
-  instruction="Deliver this product artifact:
-  1. Save to the appropriate path (docs/, specs/, etc.)
-  2. Add a brief header: artifact name, date, owner
-  3. Produce a one-paragraph stakeholder summary: what this is, what decision it enables
-  4. Note explicitly what this artifact does NOT cover
-  
-  Validation: [validation_report]
-  Intent: [intent_document]",
-  context_depth="recent",
-  context_scope="conversation"
-)
-```
+### Convergence Loop
+
+Read the priority gap from the assessment. Route to the agent that serves
+the weakest lens:
+
+- Intent Clarity gap → `zerovector:intent-analyst` (jobs-to-be-done + outcomes)
+- Specification gap → `zerovector:architect` (flow structure + decision points)
+- Implementation gap → `zerovector:builder` (artifact production — specs, flows)
+- Quality gap → `zerovector:critic` (quality pass — consistency, user-centricity)
+- Ship-Readiness gap → `zerovector:shipper` (stakeholder-ready delivery)
+
+After the agent acts, delegate back to `zerovector:critic` for a fresh
+multi-lens assessment. Do not reuse prior scores.
+
+Each iteration addresses exactly one priority gap — no multi-lens jumps.
+Maximum iterations: **8**.
+
+### When Convergence Is Reached
+
+Present the artifact and final fidelity state to the human. Wait for
+explicit approval before shipping.
+
+### When the Loop Exhausts
+
+Surface the final fidelity assessment clearly labeled:
+"Convergence loop exhausted — 8 iterations completed, fidelity at X.XX / target Y.YY"
+
+Present choices:
+- Accept current state
+- Continue with targeted fixes
+- Stop and revise intent
+
+Do NOT silently declare convergence to end the loop.
 
 ## Anti-Rationalization (Red Flags — Product Domain)
 
@@ -151,10 +137,10 @@ Stop and re-read your role if you catch yourself thinking:
 |---------|----------------|
 | "I'll skip the JTBD framing — the request is obvious" | Product artifacts built without a clear job-to-be-done drift into opinion. Jobs anchor the work. |
 | "This spec doesn't need acceptance criteria — it's just a document" | Every spec task needs criteria. "Just a document" fails when stakeholders disagree on what it covers. |
-| "The critic says CONDITIONAL_PASS — it's close enough to ship" | It is not PASS. Fix the specific issues, then re-validate before shipping to stakeholders. |
+| "Fidelity is 0.78 — close enough to the target" | It is not converged. Route to the priority gap. Let the loop work. |
 | "I'll write the spec myself — the architect is slower" | No. The orchestrator does not produce product artifacts. The crew does. |
 | "The human already knows what they want — I'll skip intent decoding" | What the human says they want and what job they're trying to do are often different. Decode both. |
-| "This is just internal — quality bar can be lower" | Internal artifacts shape real decisions. Lower bar = lower quality decisions downstream. |
+| "I'll fix two lenses at once to save iterations" | One priority gap per iteration. Multi-lens jumps cause translation loss. |
 
 ## Transitions
 
