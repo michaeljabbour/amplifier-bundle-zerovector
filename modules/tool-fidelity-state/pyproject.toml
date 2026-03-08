@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "amplifier-module-tool-fidelity-state"
+version = "0.3.0"
+requires-python = ">=3.11"
+
+[project.entry-points."amplifier.modules"]
+tool-fidelity-state = "amplifier_module_tool_fidelity_state:mount"
+
+[tool.hatch.build.targets.wheel]
+packages = ["amplifier_module_tool_fidelity_state"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24"]
