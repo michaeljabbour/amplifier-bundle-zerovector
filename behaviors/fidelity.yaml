@@ -24,11 +24,11 @@ bundle:
 
 hooks:
   - module: hooks-fidelity-reporter
-    source: 'zerovector:modules/hooks-fidelity-reporter'
+    source: ../modules/hooks-fidelity-reporter
 
 tools:
   - module: tool-fidelity-state
-    source: 'zerovector:modules/tool-fidelity-state'
+    source: ../modules/tool-fidelity-state
 
 agents:
   include:

@@ -11,13 +11,13 @@ includes:
 
 hooks:
   - module: hooks-mode
-    source: "modes:modules/hooks-mode"
+    source: git+https://github.com/microsoft/amplifier-bundle-modes@main#subdirectory=modules/hooks-mode
     config:
       search_paths: ["@zerovector:modes"]
 
 tools:
   - module: tool-mode
-    source: "modes:modules/tool-mode"
+    source: git+https://github.com/microsoft/amplifier-bundle-modes@main#subdirectory=modules/tool-mode
     config:
       gate_policy: "warn"
 

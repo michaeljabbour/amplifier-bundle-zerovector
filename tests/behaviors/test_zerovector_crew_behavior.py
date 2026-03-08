@@ -135,7 +135,10 @@ class TestZerovectorCrewBehaviorHooks:
     def test_hooks_mode_source(self):
         data = _load_behavior()
         hooks_mode = next(h for h in data["hooks"] if h["module"] == "hooks-mode")
-        assert hooks_mode["source"] == "modes:modules/hooks-mode"
+        assert (
+            "amplifier-bundle-modes" in hooks_mode["source"]
+            and "hooks-mode" in hooks_mode["source"]
+        )
 
     def test_hooks_mode_search_paths(self):
         data = _load_behavior()
@@ -160,7 +163,10 @@ class TestZerovectorCrewBehaviorTools:
     def test_tool_mode_source(self):
         data = _load_behavior()
         tool_mode = next(t for t in data["tools"] if t["module"] == "tool-mode")
-        assert tool_mode["source"] == "modes:modules/tool-mode"
+        assert (
+            "amplifier-bundle-modes" in tool_mode["source"]
+            and "tool-mode" in tool_mode["source"]
+        )
 
     def test_tool_mode_gate_policy_warn(self):
         data = _load_behavior()

@@ -57,7 +57,7 @@ class TestFidelityBehaviorHooks:
     def test_hooks_fidelity_reporter_source(self):
         data = _load_behavior()
         hook = data["hooks"][0]
-        assert hook["source"] == "zerovector:modules/hooks-fidelity-reporter"
+        assert hook["source"] == "../modules/hooks-fidelity-reporter"
 
 
 class TestFidelityBehaviorTools:
@@ -76,7 +76,7 @@ class TestFidelityBehaviorTools:
     def test_tool_fidelity_state_source(self):
         data = _load_behavior()
         tool = data["tools"][0]
-        assert tool["source"] == "zerovector:modules/tool-fidelity-state"
+        assert tool["source"] == "../modules/tool-fidelity-state"
 
 
 class TestFidelityBehaviorAgents:
