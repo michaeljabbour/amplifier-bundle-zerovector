@@ -22,6 +22,11 @@ tools:
       gate_policy: "warn"
   - module: tool-fidelity-state
     source: ../modules/tool-fidelity-state
+  - module: tool-skills
+    source: git+https://github.com/microsoft/amplifier-module-tool-skills@main
+    config:
+      skills:
+        - "@zerovector:skills"
 
 agents:
   include:
@@ -33,6 +38,5 @@ agents:
 context:
   include:
     - zerovector:context/using-zerovector.md
-    - zerovector:context/crew-instructions.md
-    - zerovector:context/domain-tuning.md
+    - zerovector:context/crew-routing.md
     - modes:context/modes-instructions.md
