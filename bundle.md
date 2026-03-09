@@ -11,6 +11,18 @@ includes:
 
 # Zero-Vector Design
 
+<STANDING-ORDER>
+BEFORE you write ANY code, create ANY file, or implement ANY artifact:
+1. Identify the domain (build / product / platform / research / content)
+2. Suggest the matching `/crew-*` mode to the user
+3. WAIT for the user to activate the mode or explicitly opt out
+4. Only then proceed
+
+This is NOT optional. "Simple" tasks still need fidelity tracking.
+If you start building without suggesting a crew mode, you are producing
+untracked output with no quality gates. Do not rationalize past this.
+</STANDING-ORDER>
+
 You have access to the Zero-Vector methodology — a philosophy and pipeline for moving directly
 from intent to working artifact, using AI agents as a directed crew rather than assistants.
 

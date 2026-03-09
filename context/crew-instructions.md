@@ -104,10 +104,12 @@ Maximum iterations: **8**.
 3. **Act**: The routed agent performs its work. Pass it the current fidelity
    assessment so it knows exactly what translation loss to address.
 
-4. **Re-assess**: After the agent acts, delegate back to `zerovector:critic`
+4. **Update fidelity immediately**: See the MANDATORY update checklist below.
+
+5. **Re-assess**: After the agent acts, delegate back to `zerovector:critic`
    for a fresh fidelity assessment. Do not reuse prior scores.
 
-5. **Converge or loop**: If overall fidelity meets the domain target, present
+6. **Converge or loop**: If overall fidelity meets the domain target, present
    the artifact and final fidelity state to the human. Otherwise, loop back.
 
 ### When the Loop Exhausts Without Convergence
@@ -127,6 +129,71 @@ Maximum iterations: **8**.
 - The critic re-assesses ALL lenses after each iteration (scores may shift)
 - The critic does NOT retroactively inflate scores to force convergence
 - The `update_fidelity` tool must be called after each assessment to persist state
+
+<CRITICAL>
+## MANDATORY: Update Fidelity After Every Delegation
+
+The fidelity dashboard is the ONLY way the human sees progress. If you do not
+call `update_fidelity` after each agent returns, the dashboard stays frozen at
+0.00 and the human sees no movement — even when real work has been completed.
+
+**EVERY time a delegate() call returns, your NEXT action MUST be `update_fidelity`.**
+No exceptions. Before updating todos, before routing to the next agent, before
+presenting results — call `update_fidelity` FIRST.
+
+### Exact Scores to Use
+
+| Agent That Just Returned | How to Score |
+|--------------------------|-------------|
+| **critic** | Use the critic's EXACT lens_scores from its JSON output. Copy all five numbers verbatim. |
+| **intent-analyst** | Set `intent_clarity` to 0.75-0.90 based on completeness of the intent document. Keep other lenses at their current values. |
+| **architect** | Set `specification` to 0.60-0.85 based on spec completeness (tasks, acceptance criteria, interfaces defined). Keep other lenses at their current values. |
+| **builder** | Set `implementation` to 0.50-0.80 based on test results and code completion in the builder's report. Keep other lenses at their current values. |
+| **shipper** | Set `ship_readiness` to 0.60-0.90 based on delivery status. Keep other lenses at their current values. |
+
+### Example — After Architect Returns a Full Spec
+
+```
+update_fidelity(
+  lens_scores={
+    "intent_clarity": 0.82,      # carry forward from last assessment
+    "specification": 0.75,       # NEW — architect produced a full spec
+    "implementation": 0.0,       # not started yet
+    "quality": 0.0,              # not started yet
+    "ship_readiness": 0.0        # not started yet
+  },
+  domain="build",
+  target=0.85
+)
+```
+
+### Example — After Builder Returns With Passing Tests
+
+```
+update_fidelity(
+  lens_scores={
+    "intent_clarity": 0.82,      # carry forward
+    "specification": 0.75,       # carry forward
+    "implementation": 0.70,      # NEW — builder reports 17/17 tests passing
+    "quality": 0.40,             # NEW — estimate from builder's lint/type output
+    "ship_readiness": 0.0        # not started yet
+  },
+  domain="build",
+  target=0.85
+)
+```
+
+### If the Critic Delegation Fails
+
+Do NOT leave all lenses at 0.00. Instead:
+1. Inspect the project path yourself (read the directory, check for files)
+2. If artifacts exist, estimate scores based on what you find
+3. Call `update_fidelity` with your best estimates
+4. Retry the critic delegation or proceed with routing
+
+A stale dashboard showing 0.00 across all lenses when real artifacts exist
+is a worse failure than an imprecise estimate.
+</CRITICAL>
 
 ---
 
@@ -246,43 +313,6 @@ See `domain-tuning.md` for detailed domain calibration per lens.
 
 ---
 
-## Fidelity State Updates (Root Session)
-
-The fidelity dashboard is only visible to the user when `update_fidelity` is called in YOUR session (the root session). Child agent sessions have their own fidelity state that the user cannot see.
-
-**After EVERY agent delegation returns, YOU must call `update_fidelity` with estimated scores:**
-
-| After This Agent Returns | Update These Lenses |
-|--------------------------|---------------------|
-| **intent-analyst** | `intent_clarity`: 0.75-0.90 (based on how complete the intent document is) |
-| **architect** | `specification`: 0.60-0.85 (based on spec completeness — tasks, acceptance criteria, interfaces) |
-| **builder** | `implementation`: 0.50-0.80 (based on code completion and test results in builder's report) |
-| **critic** | ALL lenses with the critic's exact scores from the JSON output |
-| **shipper** | `ship_readiness`: 0.60-0.90 (based on delivery status) |
-
-**Rules:**
-- Call `update_fidelity` ONCE after each delegation returns — not before, not during
-- Use the agent's output to estimate scores. Don't guess — read what they reported.
-- When the critic returns scores, use those EXACT numbers (they're precise). For other agents, estimate based on what they accomplished.
-- The dashboard updates after each call, so the user sees progressive improvement.
-
-**Example after architect returns a full spec:**
-```
-update_fidelity(
-  lens_scores={
-    "intent_clarity": 0.82,
-    "specification": 0.75,
-    "implementation": 0.0,
-    "quality": 0.0,
-    "ship_readiness": 0.0
-  },
-  domain="build",
-  target=0.85
-)
-```
-
----
-
 ## Anti-Rationalization
 
 Catch yourself before these failures occur:
@@ -296,6 +326,8 @@ Catch yourself before these failures occur:
 | "I'll skip the approval point — the human is in a hurry" | Approval points are contractual. Present fidelity state and ask. |
 | "I'll fix two lenses at once to save iterations" | One priority gap per iteration. Multi-lens jumps cause translation loss. |
 | "The scores look fine — no need to call update_fidelity" | Always persist. The dashboard and ephemeral guidance depend on current state. |
+| "I'll update fidelity after routing to the next agent" | No. update_fidelity is your FIRST action after a delegation returns. The human is watching a frozen dashboard. |
+| "The critic failed — I'll just score intent and move on" | Inspect the project path. If artifacts exist, estimate ALL lenses. A frozen 0.00 dashboard is worse than an imprecise estimate. |
 
 ---
 
