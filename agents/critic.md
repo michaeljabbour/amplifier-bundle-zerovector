@@ -257,29 +257,15 @@ VERDICT: FAIL
 
 This line is parsed by the recipe engine. It must be on its own line, no trailing text.
 
-### 6. Update Fidelity State
+### 6. Structured Fidelity Output
 
-After completing both passes and producing the validation report, call `update_fidelity`
-**exactly once** to push your fidelity scores into session state. This enables convergence
-tracking across pipeline stages and surfaces the fidelity dashboard.
+Your fidelity assessment JSON block (produced in Pass 1) is consumed by the orchestrator
+to update the root session's fidelity state. You do NOT need to call `update_fidelity`
+yourself — the orchestrator handles this after your delegation returns.
 
-```js
-update_fidelity({
-  "lens_scores": {
-    "intent_clarity": 0.90,
-    "specification": 0.85,
-    "implementation": 0.78,
-    "quality": 0.82,
-    "ship_readiness": 0.70
-  },
-  "domain": "build",
-  "target": 0.85
-})
-```
-
-Call this tool **once per validation run** — after the report is written and the VERDICT line
-is determined. Do not call it during Pass 1, during Pass 2, or multiple times in a single
-invocation. One call, at the end, with the final scores. Then stop.
+Your job: produce the structured JSON with accurate scores. The orchestrator's job: persist
+those scores and render the dashboard. This separation ensures the fidelity dashboard is
+visible to the user in the main session (not hidden inside your child session).
 
 ---
 
