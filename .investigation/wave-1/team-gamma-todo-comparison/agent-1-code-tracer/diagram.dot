@@ -1,0 +1,298 @@
+digraph todo_vs_fidelity_architecture {
+    graph [
+        label="Todo Tool Architecture vs. Fidelity Tool Architecture\nParallax Discovery — team-gamma-todo-comparison — agent-1-code-tracer"
+        labelloc="t"
+        fontsize=16
+        fontname="Helvetica"
+        rankdir=LR
+        splines=ortho
+        nodesep=0.6
+        ranksep=1.2
+        bgcolor="#f8f8f8"
+    ]
+    node [fontname="Helvetica" fontsize=11 style=filled]
+    edge [fontname="Helvetica" fontsize=9]
+
+    // =========================================================
+    // SUBGRAPH: TODO ARCHITECTURE (LEFT SIDE)
+    // =========================================================
+    subgraph cluster_todo {
+        label="TODO TOOL SYSTEM (always-on, foundation base profile)"
+        style=filled
+        fillcolor="#e8f5e9"
+        color="#2e7d32"
+        fontcolor="#1b5e20"
+        fontsize=13
+        fontname="Helvetica Bold"
+
+        // Foundation base profile
+        base_profile [
+            label="Foundation Base Profile\namplifierd/registry/profiles/foundation/base.md\n(lines 36-61)"
+            shape=tab
+            fillcolor="#a5d6a7"
+            color="#2e7d32"
+        ]
+
+        // tool-todo module
+        tool_todo [
+            label="tool-todo\ngit+github.com/microsoft/\namplifier-module-tool-todo@main\n\nActions: create | update | list\nState: coordinator.todo_state"
+            shape=box3d
+            fillcolor="#81c784"
+            color="#2e7d32"
+            fontsize=10
+        ]
+
+        // hooks-todo-reminder module
+        hook_todo [
+            label="hooks-todo-reminder\ngit+github.com/microsoft/\namplifier-module-hooks-todo-reminder@main\n\nEvents: provider:request (inject)\n         tool:post (track usage)\nConfig: inject_role=user, priority=10\nrecent_tool_threshold=3"
+            shape=component
+            fillcolor="#66bb6a"
+            color="#2e7d32"
+            fontsize=10
+        ]
+
+        // Todo state in coordinator
+        todo_state [
+            label="coordinator.todo_state\n(in-memory, session-scoped)"
+            shape=cylinder
+            fillcolor="#c8e6c9"
+            color="#388e3c"
+        ]
+
+        // Behavior YAML
+        todo_behavior [
+            label="behaviors/todo-reminder.yaml\namplifier-foundation/"
+            shape=note
+            fillcolor="#dcedc8"
+            color="#558b2f"
+            fontsize=9
+        ]
+    }
+
+    // =========================================================
+    // SUBGRAPH: FIDELITY ARCHITECTURE (RIGHT SIDE)
+    // =========================================================
+    subgraph cluster_fidelity {
+        label="FIDELITY TOOL SYSTEM (opt-in, zerovector bundle only)"
+        style=filled
+        fillcolor="#fff3e0"
+        color="#e65100"
+        fontcolor="#bf360c"
+        fontsize=13
+        fontname="Helvetica Bold"
+
+        // Zerovector fidelity behavior
+        fidelity_behavior [
+            label="behaviors/fidelity.yaml\namplifier-bundle-zerovector/\n(explicit opt-in required)"
+            shape=tab
+            fillcolor="#ffcc80"
+            color="#e65100"
+        ]
+
+        // tool-fidelity-state module
+        tool_fidelity [
+            label="tool-fidelity-state\n../modules/tool-fidelity-state\n\nTool: update_fidelity\nLenses: intent_clarity, specification,\n  implementation, quality, ship_readiness\nDefault target: 0.85"
+            shape=box3d
+            fillcolor="#ffb74d"
+            color="#e65100"
+            fontsize=10
+        ]
+
+        // hooks-fidelity-reporter module
+        hook_fidelity [
+            label="hooks-fidelity-reporter\n../modules/hooks-fidelity-reporter\n\nEvents: tool:post (AFTER tool calls)\n         prompt:complete (AFTER turns)\nGuard: returns _CONTINUE if no lens_scores\nPriority: 50"
+            shape=component
+            fillcolor="#ffa726"
+            color="#e65100"
+            fontsize=10
+        ]
+
+        // Fidelity state capability
+        fidelity_state [
+            label="zerovector.fidelity_state\n(coordinator capability,\nrequires update_fidelity call\nbefore any injection)"
+            shape=cylinder
+            fillcolor="#ffe0b2"
+            color="#f57c00"
+        ]
+
+        // Guard node
+        guard [
+            label="GUARD:\nif not state.lens_scores:\n  return _CONTINUE"
+            shape=diamond
+            fillcolor="#ffccbc"
+            color="#bf360c"
+            fontsize=9
+        ]
+    }
+
+    // =========================================================
+    // SUBGRAPH: SHARED KERNEL INFRASTRUCTURE
+    // =========================================================
+    subgraph cluster_kernel {
+        label="AMPLIFIER KERNEL (amplifier-core)"
+        style=filled
+        fillcolor="#e3f2fd"
+        color="#1565c0"
+        fontcolor="#0d47a1"
+        fontsize=13
+        fontname="Helvetica Bold"
+
+        // HookRegistry
+        hook_registry [
+            label="HookRegistry\nhooks.py\n\nregister(event, handler, priority)\nemit(event, data) → HookResult"
+            shape=ellipse
+            fillcolor="#90caf9"
+            color="#1565c0"
+        ]
+
+        // Events
+        provider_request_event [
+            label="PROVIDER_REQUEST\n\"provider:request\"\nevents.py:20\n\nFires: TOP of every\norchestrator iteration"
+            shape=oval
+            fillcolor="#64b5f6"
+            color="#1565c0"
+            fontsize=10
+            style="filled,bold"
+        ]
+
+        tool_post_event [
+            label="TOOL_POST\n\"tool:post\"\nevents.py:31\n\nFires: AFTER every\ntool execution"
+            shape=oval
+            fillcolor="#42a5f5"
+            color="#1565c0"
+            fontsize=10
+        ]
+
+        prompt_complete_event [
+            label="PROMPT_COMPLETE\n\"prompt:complete\"\nevents.py:13\n\nFires: AFTER\nentire turn"
+            shape=oval
+            fillcolor="#42a5f5"
+            color="#1565c0"
+            fontsize=10
+        ]
+
+        // HookResult model
+        hook_result [
+            label="HookResult\nmodels.py:35-221\n\naction: inject_context\nephemeral: True\ncontext_injection: str\nappend_to_last_tool_result: bool"
+            shape=record
+            fillcolor="#bbdefb"
+            color="#1976d2"
+            fontsize=9
+        ]
+
+        // Coordinator
+        coordinator [
+            label="ModuleCoordinator\ncoordinator.py\n\nprocess_hook_result()\n_handle_context_injection()\n  → skips context.add_message()\n    if ephemeral=True"
+            shape=hexagon
+            fillcolor="#90caf9"
+            color="#1565c0"
+        ]
+    }
+
+    // =========================================================
+    // SUBGRAPH: ORCHESTRATOR
+    // =========================================================
+    subgraph cluster_orchestrator {
+        label="ORCHESTRATOR (loop-streaming)"
+        style=filled
+        fillcolor="#f3e5f5"
+        color="#6a1b9a"
+        fontcolor="#4a148c"
+        fontsize=13
+        fontname="Helvetica Bold"
+
+        orch_loop [
+            label="_execute_stream()\nloop-streaming/__init__.py:196\n\nwhile max_iter:\n  1. emit(PROVIDER_REQUEST)\n  2. get_messages_for_request()\n  3. append ephemeral injections\n  4. provider.complete(ChatRequest)\n  5. process tools\n     → emit(TOOL_POST)\n     → store pending ephemeral"
+            shape=box
+            fillcolor="#ce93d8"
+            color="#6a1b9a"
+            fontsize=10
+        ]
+
+        message_list [
+            label="message_dicts\n(transient per-call list)\n\nEphemeral injections appended\nhere ONLY — never persisted\nto context.add_message()"
+            shape=parallelogram
+            fillcolor="#e1bee7"
+            color="#7b1fa2"
+            fontsize=9
+        ]
+
+        pending_injections [
+            label="_pending_ephemeral_injections\n(list, cleared each iteration)\n\nStores tool:post injections\nfor next iteration"
+            shape=note
+            fillcolor="#e1bee7"
+            color="#7b1fa2"
+            fontsize=9
+        ]
+
+        llm_call [
+            label="provider.complete(ChatRequest)\n← LLM sees full context\n   + ephemeral injections"
+            shape=doubleoctagon
+            fillcolor="#ba68c8"
+            color="#6a1b9a"
+        ]
+    }
+
+    // =========================================================
+    // EDGES: TODO FLOW
+    // =========================================================
+
+    base_profile -> tool_todo [label="mounts as tool" color="#2e7d32" style=bold]
+    base_profile -> hook_todo [label="mounts as hook" color="#2e7d32" style=bold]
+    todo_behavior -> base_profile [label="behavior definition" color="#558b2f" style=dashed]
+
+    tool_todo -> todo_state [label="writes\ntodo_state" color="#2e7d32"]
+    hook_todo -> todo_state [label="reads\ntodo_state" color="#2e7d32"]
+
+    provider_request_event -> hook_todo [label="fires → todo\nreminder" color="#1565c0" style=bold penwidth=2]
+    tool_post_event -> hook_todo [label="fires → track\nrecent usage" color="#1565c0"]
+
+    hook_todo -> hook_result [label="returns\ninject_context\nephemeral=True" color="#2e7d32"]
+
+    // =========================================================
+    // EDGES: FIDELITY FLOW
+    // =========================================================
+
+    fidelity_behavior -> tool_fidelity [label="mounts as tool\n(explicit opt-in)" color="#e65100" style=bold]
+    fidelity_behavior -> hook_fidelity [label="mounts as hook\n(explicit opt-in)" color="#e65100" style=bold]
+
+    tool_fidelity -> fidelity_state [label="registers capability\nwhen update_fidelity\nis called" color="#e65100"]
+    hook_fidelity -> fidelity_state [label="reads via\nget_capability()" color="#e65100"]
+    fidelity_state -> guard [label="check lens_scores" color="#bf360c"]
+
+    tool_post_event -> hook_fidelity [label="fires\n(AFTER tools)" color="#1565c0"]
+    prompt_complete_event -> hook_fidelity [label="fires\n(AFTER turns)" color="#1565c0"]
+
+    hook_fidelity -> hook_result [label="returns inject_context\nephemeral=True\n(only if lens_scores exist)" color="#e65100" style=dashed]
+    guard -> hook_result [label="_CONTINUE if\nno scores" color="#bf360c" style=dashed]
+
+    // =========================================================
+    // EDGES: KERNEL/ORCHESTRATOR FLOW
+    // =========================================================
+
+    hook_registry -> provider_request_event [label="emit()" color="#1565c0" style=invis]
+    hook_registry -> tool_post_event [label="emit()" color="#1565c0" style=invis]
+    hook_registry -> prompt_complete_event [label="emit()" color="#1565c0" style=invis]
+
+    orch_loop -> provider_request_event [label="emit at\nloop top" color="#6a1b9a" penwidth=2]
+    orch_loop -> tool_post_event [label="emit after\neach tool" color="#6a1b9a"]
+    orch_loop -> prompt_complete_event [label="emit after\nturn ends" color="#6a1b9a"]
+
+    hook_result -> coordinator [label="processed by" color="#1565c0"]
+    coordinator -> message_list [label="if ephemeral=True\nskip context.add_message()\nonly append to message_dicts" color="#1565c0" style=bold]
+    message_list -> llm_call [label="sent to LLM" color="#6a1b9a" style=bold penwidth=2]
+    orch_loop -> pending_injections [label="stores tool:post\nephemeral injections" color="#6a1b9a"]
+    pending_injections -> message_list [label="applied next\niteration" color="#6a1b9a"]
+
+    // =========================================================
+    // KEY INSIGHT NODE
+    // =========================================================
+    insight [
+        label="KEY ARCHITECTURAL DIFFERENCE\n\nTODO: fires on provider:request\n→ Before EVERY LLM call\n→ Always fires, even if state empty\n→ In base profile (always present)\n→ CLOSED feedback loop\n\nFIDELITY: fires on tool:post / prompt:complete\n→ After events (reactive)\n→ Silent _CONTINUE if state empty\n→ Opt-in only (not in base profile)\n→ OPEN loop (requires explicit calls)"
+        shape=note
+        fillcolor="#fff9c4"
+        color="#f57f17"
+        fontsize=10
+        fontname="Helvetica Bold"
+    ]
+}

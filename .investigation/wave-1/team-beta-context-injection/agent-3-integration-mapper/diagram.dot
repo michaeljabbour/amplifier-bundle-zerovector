@@ -1,0 +1,314 @@
+// Fidelity Context Injection Chain — Cross-Boundary Integration Map
+// Agent-3 (Integration Mapper) — WHERE/WHY analysis
+//
+// Nodes = mechanisms/subsystems
+// Edges = boundaries with labels showing what crosses and direction
+// Red edges = confirmed failure points (from git history)
+// Dashed edges = LLM-mediated (non-deterministic) boundaries
+
+digraph fidelity_integration {
+    rankdir=TB;
+    fontname="Helvetica";
+    node [fontname="Helvetica", fontsize=11];
+    edge [fontname="Helvetica", fontsize=9];
+    
+    // ===== LAYER 1: Bundle Composition =====
+    subgraph cluster_composition {
+        label="Bundle Composition Layer";
+        style=dashed;
+        color="#888888";
+        fontcolor="#888888";
+        
+        fidelity_yaml [
+            label="fidelity.yaml\n(behavior)",
+            shape=note,
+            style=filled,
+            fillcolor="#E8F4FD"
+        ];
+        crew_yaml [
+            label="zerovector-crew.yaml\n(behavior)",
+            shape=note,
+            style=filled,
+            fillcolor="#E8F4FD"
+        ];
+        bundle_md [
+            label="bundle.md\n(root bundle)",
+            shape=note,
+            style=filled,
+            fillcolor="#D4E8FC"
+        ];
+        compose [
+            label="Bundle.compose()\nmerge_module_lists()",
+            shape=box,
+            style="rounded,filled",
+            fillcolor="#FFF3CD"
+        ];
+    }
+    
+    // ===== LAYER 2: Session Infrastructure =====
+    subgraph cluster_root_session {
+        label="Root Session (Orchestrator)";
+        style=filled;
+        fillcolor="#F0FFF0";
+        color="#228B22";
+        
+        root_coordinator [
+            label="ModuleCoordinator\n(root)",
+            shape=box3d,
+            style=filled,
+            fillcolor="#FFFFFF"
+        ];
+        root_fidelity_state [
+            label="FidelityState\n(root — user-visible)",
+            shape=cylinder,
+            style=filled,
+            fillcolor="#90EE90"
+        ];
+        update_fidelity_tool [
+            label="update_fidelity\n(tool)",
+            shape=component,
+            style=filled,
+            fillcolor="#FFFFFF"
+        ];
+        fidelity_hook [
+            label="hooks-fidelity-reporter\n(priority 50)",
+            shape=component,
+            style=filled,
+            fillcolor="#FFFFFF"
+        ];
+        crew_gate_hook [
+            label="hooks-crew-gate\n(priority 10)",
+            shape=component,
+            style=filled,
+            fillcolor="#FFFFFF"
+        ];
+        mode_system [
+            label="hooks-mode\n+ tool-mode",
+            shape=component,
+            style=filled,
+            fillcolor="#FFFFFF"
+        ];
+        context_manager [
+            label="Context Manager\n(system prompt)",
+            shape=folder,
+            style=filled,
+            fillcolor="#FFFFFF"
+        ];
+        orchestrator_llm [
+            label="Orchestrator LLM\n(the bridge)",
+            shape=ellipse,
+            style="filled,bold",
+            fillcolor="#FFE4E1"
+        ];
+    }
+    
+    subgraph cluster_child_session {
+        label="Child Session (e.g., zerovector:critic)";
+        style=filled;
+        fillcolor="#FFF0F0";
+        color="#CD5C5C";
+        
+        child_coordinator [
+            label="ModuleCoordinator\n(child)",
+            shape=box3d,
+            style=filled,
+            fillcolor="#FFFFFF"
+        ];
+        child_fidelity_state [
+            label="FidelityState\n(child — INVISIBLE)",
+            shape=cylinder,
+            style=filled,
+            fillcolor="#FFB6C1",
+        ];
+        critic_llm [
+            label="Critic LLM\n(produces JSON scores)",
+            shape=ellipse,
+            style=filled,
+            fillcolor="#FFE4E1"
+        ];
+    }
+    
+    // ===== LAYER 3: Output =====
+    subgraph cluster_output {
+        label="User-Visible Output";
+        style=dashed;
+        color="#888888";
+        fontcolor="#888888";
+        
+        dashboard [
+            label="ANSI Dashboard\n(stdout)",
+            shape=tab,
+            style=filled,
+            fillcolor="#E8E8E8"
+        ];
+        ephemeral [
+            label="Ephemeral Routing\nAdvice (to LLM)",
+            shape=parallelogram,
+            style=filled,
+            fillcolor="#E8E8E8"
+        ];
+    }
+    
+    // ===== COMPOSITION EDGES =====
+    fidelity_yaml -> compose [
+        label="hooks, tools,\ncontext includes",
+        color="#4169E1"
+    ];
+    crew_yaml -> compose [
+        label="hooks, tools,\nagents, context,\nmodes",
+        color="#4169E1"
+    ];
+    bundle_md -> compose [
+        label="includes\nzerovector-crew",
+        color="#4169E1"
+    ];
+    crew_yaml -> fidelity_yaml [
+        label="includes (transitive)",
+        style=dotted,
+        color="#FF0000",
+        fontcolor="#FF0000",
+        constraint=false
+    ];
+    
+    // ===== COMPOSITION → SESSION EDGES =====
+    compose -> root_coordinator [
+        label="mount plan:\nhooks, tools,\nagents, context",
+        color="#4169E1",
+        penwidth=2
+    ];
+    compose -> context_manager [
+        label="ALL context files\n(no filtering)",
+        color="#4169E1"
+    ];
+    
+    // ===== ROOT SESSION INTERNAL EDGES =====
+    root_coordinator -> root_fidelity_state [
+        label="registers\ncapability",
+        color="#228B22"
+    ];
+    root_coordinator -> update_fidelity_tool [
+        label="mounts tool",
+        color="#228B22"
+    ];
+    root_coordinator -> fidelity_hook [
+        label="registers on\ntool:post,\nprompt:complete",
+        color="#228B22"
+    ];
+    root_coordinator -> crew_gate_hook [
+        label="registers on\nprompt:complete,\ntool:post",
+        color="#228B22"
+    ];
+    
+    update_fidelity_tool -> root_fidelity_state [
+        label="writes\nlens_scores",
+        color="#228B22",
+        penwidth=2
+    ];
+    fidelity_hook -> root_fidelity_state [
+        label="reads state\n(if lens_scores\nnon-empty)",
+        color="#228B22"
+    ];
+    fidelity_hook -> dashboard [
+        label="ANSI to\nstdout",
+        color="#228B22"
+    ];
+    fidelity_hook -> ephemeral [
+        label="HookResult\nephemeral=True",
+        color="#228B22"
+    ];
+    
+    mode_system -> update_fidelity_tool [
+        label="tool safety\n(was BLOCKED\nbefore fix)",
+        color="#FF0000",
+        fontcolor="#FF0000",
+        style=dashed,
+        penwidth=2
+    ];
+    
+    // ===== THE CRITICAL LLM-MEDIATED BRIDGE =====
+    orchestrator_llm -> update_fidelity_tool [
+        label="MUST call after\nevery delegation\n(LLM-mediated!)",
+        color="#FF0000",
+        fontcolor="#FF0000",
+        style=dashed,
+        penwidth=3
+    ];
+    
+    context_manager -> orchestrator_llm [
+        label="780+ lines of\nfidelity instructions\n+ mode body\n+ ephemeral injections",
+        color="#4169E1"
+    ];
+    
+    ephemeral -> orchestrator_llm [
+        label="routing advice\n(only AFTER first\nupdate_fidelity)",
+        color="#FF8C00",
+        fontcolor="#FF8C00",
+        style=dashed
+    ];
+    
+    crew_gate_hook -> orchestrator_llm [
+        label="\"suggest a mode\"\n(when no mode active,\ncompetes for attention)",
+        color="#FF8C00",
+        fontcolor="#FF8C00",
+        style=dashed
+    ];
+    
+    // ===== ROOT → CHILD BOUNDARY =====
+    orchestrator_llm -> child_coordinator [
+        label="delegate()\nspawns child session",
+        color="#8B0000",
+        penwidth=2
+    ];
+    
+    child_coordinator -> child_fidelity_state [
+        label="NEW empty\nFidelityState",
+        color="#CD5C5C"
+    ];
+    
+    critic_llm -> orchestrator_llm [
+        label="returns text with\nJSON scores\n(NO state transfer)",
+        color="#8B0000",
+        fontcolor="#8B0000",
+        style=dashed,
+        penwidth=2
+    ];
+    
+    // ===== INVISIBLE ANNOTATIONS =====
+    bug1 [
+        label="BUG (6a0999e):\nTransitive include\ndidn't merge hooks",
+        shape=octagon,
+        style=filled,
+        fillcolor="#FF6347",
+        fontcolor="white",
+        fontsize=9
+    ];
+    bug2 [
+        label="BUG (55866e1):\nupdate_fidelity\nblocked by mode",
+        shape=octagon,
+        style=filled,
+        fillcolor="#FF6347",
+        fontcolor="white",
+        fontsize=9
+    ];
+    bug3 [
+        label="BUG (9a49682):\nCritic updated\nwrong session",
+        shape=octagon,
+        style=filled,
+        fillcolor="#FF6347",
+        fontcolor="white",
+        fontsize=9
+    ];
+    bug4 [
+        label="FIX (1ed8932):\nAdded CRITICAL section\n(prompt engineering)",
+        shape=octagon,
+        style=filled,
+        fillcolor="#FFA500",
+        fontcolor="white",
+        fontsize=9
+    ];
+    
+    bug1 -> crew_yaml [style=dotted, color="#FF6347", arrowhead=none];
+    bug2 -> mode_system [style=dotted, color="#FF6347", arrowhead=none];
+    bug3 -> child_fidelity_state [style=dotted, color="#FF6347", arrowhead=none];
+    bug4 -> orchestrator_llm [style=dotted, color="#FFA500", arrowhead=none];
+}

@@ -1,0 +1,181 @@
+digraph D01_ActionMismatch {
+    rankdir=TB;
+    fontname="Courier New";
+    node [fontname="Courier New", fontsize=11];
+    edge [fontname="Courier New", fontsize=10];
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Subgraph: What the hook returns
+    // ─────────────────────────────────────────────────────────────────────
+    subgraph cluster_hook {
+        label="hooks-fidelity-reporter/__init__.py:310-317";
+        style=filled;
+        fillcolor="#fff3cd";
+        fontcolor="#664d00";
+
+        hook_return [
+            label="HookResult(\l  action=\"continue\",      ← BUG\l  context_injection=<text>,\l  ephemeral=True,\l  user_message=<dashboard>\l)",
+            shape=record,
+            style=filled,
+            fillcolor="#ffcccc"
+        ];
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Subgraph: HookRegistry.emit()
+    // ─────────────────────────────────────────────────────────────────────
+    subgraph cluster_emit {
+        label="hooks.py:111-186  HookRegistry.emit()";
+        style=filled;
+        fillcolor="#e8f4f8";
+
+        emit_gate [
+            label="result.action == \"inject_context\"?\lhooks.py:163",
+            shape=diamond,
+            style=filled,
+            fillcolor="#d0e8ff"
+        ];
+        emit_collect [
+            label="inject_context_results.append(result)\lhooks.py:164",
+            shape=box,
+            style=filled,
+            fillcolor="#b3d9b3"
+        ];
+        emit_skip [
+            label="(no collection — falls through)\lhooks.py:165+",
+            shape=box,
+            style=filled,
+            fillcolor="#ffcccc"
+        ];
+        emit_return [
+            label="return HookResult(\l  action=\"continue\",\l  data=current_data  ← drops all fields\l)\lhooks.py:186",
+            shape=record,
+            style=filled,
+            fillcolor="#ffcccc"
+        ];
+
+        emit_gate -> emit_collect [label="YES (inject_context)", color="#228b22", fontcolor="#228b22"];
+        emit_gate -> emit_skip [label="NO  (continue)", color="#cc0000", fontcolor="#cc0000"];
+        emit_skip -> emit_return;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Subgraph: coordinator.process_hook_result()
+    // ─────────────────────────────────────────────────────────────────────
+    subgraph cluster_coordinator {
+        label="coordinator.py:342-376  process_hook_result()";
+        style=filled;
+        fillcolor="#f0e8f8";
+
+        coord_gate [
+            label="result.action == \"inject_context\"?\lcoordinator.py:361",
+            shape=diamond,
+            style=filled,
+            fillcolor="#d0e8ff"
+        ];
+        coord_inject [
+            label="_handle_context_injection()\lcoordinator.py:362",
+            shape=box,
+            style=filled,
+            fillcolor="#b3d9b3"
+        ];
+        coord_skip [
+            label="(skipped — inject never called)\l",
+            shape=box,
+            style=filled,
+            fillcolor="#ffcccc"
+        ];
+        coord_user_msg [
+            label="if result.user_message:\l  _handle_user_message()   ← works!\lcoordinator.py:369-370",
+            shape=box,
+            style=filled,
+            fillcolor="#b3d9b3"
+        ];
+
+        coord_gate -> coord_inject [label="YES", color="#228b22", fontcolor="#228b22"];
+        coord_gate -> coord_skip [label="NO  (continue)", color="#cc0000", fontcolor="#cc0000"];
+        coord_skip -> coord_user_msg;
+        coord_inject -> coord_user_msg;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Subgraph: loop-streaming orchestrator
+    // ─────────────────────────────────────────────────────────────────────
+    subgraph cluster_orchestrator {
+        label="loop-streaming/__init__.py  StreamingOrchestrator";
+        style=filled;
+        fillcolor="#f8f0e8";
+
+        orch_gate_toolpost [
+            label="post_result.action == \"inject_context\"?\l__init__.py:846",
+            shape=diamond,
+            style=filled,
+            fillcolor="#d0e8ff"
+        ];
+        orch_store [
+            label="_pending_ephemeral_injections.append(...)\l__init__.py:851-857",
+            shape=box,
+            style=filled,
+            fillcolor="#b3d9b3"
+        ];
+        orch_skip2 [
+            label="(nothing stored — list stays empty)\l__init__.py:857+",
+            shape=box,
+            style=filled,
+            fillcolor="#ffcccc"
+        ];
+        orch_gate_provider [
+            label="result.action == \"inject_context\"?\l__init__.py:222",
+            shape=diamond,
+            style=filled,
+            fillcolor="#d0e8ff"
+        ];
+        orch_append [
+            label="message_dicts.append(injection)\l__init__.py:253-260\n→ Agent sees fidelity state",
+            shape=box,
+            style=filled,
+            fillcolor="#b3d9b3"
+        ];
+        orch_skip3 [
+            label="(injection never appended)\l__init__.py:261+\n→ Agent never sees fidelity state",
+            shape=box,
+            style=filled,
+            fillcolor="#ffcccc"
+        ];
+
+        orch_gate_toolpost -> orch_store [label="YES", color="#228b22", fontcolor="#228b22"];
+        orch_gate_toolpost -> orch_skip2 [label="NO  (continue)", color="#cc0000", fontcolor="#cc0000"];
+        orch_store -> orch_gate_provider [label="next iteration"];
+        orch_gate_provider -> orch_append [label="YES", color="#228b22", fontcolor="#228b22"];
+        orch_gate_provider -> orch_skip3 [label="NO  (continue)", color="#cc0000", fontcolor="#cc0000"];
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Fix path (dashed green — what SHOULD happen after fix)
+    // ─────────────────────────────────────────────────────────────────────
+    hook_fix [
+        label="FIXED: action=\"inject_context\"\lhooks-fidelity-reporter/__init__.py:311",
+        shape=record,
+        style="filled,dashed",
+        fillcolor="#ccffcc",
+        color="#228b22"
+    ];
+    fix_result [
+        label="Agent receives:\l[FIDELITY STATE — ephemeral, auto-updates]\lStatus: NEEDS_WORK\lOverall: 0.62 | Target: 0.85\lPriority gap: implementation (0.40)\lRecommendation: ...",
+        shape=note,
+        style=filled,
+        fillcolor="#ccffcc",
+        color="#228b22"
+    ];
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Edges connecting subgraphs
+    // ─────────────────────────────────────────────────────────────────────
+    hook_return -> emit_gate [label="returned from handler"];
+    emit_return -> coord_gate [label="result of emit()"];
+    coord_skip -> orch_gate_toolpost [label="tool:post result (broken path)", color="#cc0000", style=dashed];
+
+    // Fix path
+    hook_fix -> emit_gate [label="fixed return", style=dashed, color="#228b22"];
+    orch_append -> fix_result [style=dashed, color="#228b22"];
+}

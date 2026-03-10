@@ -1,0 +1,236 @@
+// Fidelity Mechanism Integration Map — Cross-Boundary Data Flow
+// Agent: Integration Mapper (WHERE/WHY)
+// Investigation: team-alpha-fidelity-mechanism, wave-1
+//
+// Render: dot -Tsvg diagram.dot -o diagram.svg
+//         dot -Tpng diagram.dot -o diagram.png
+
+digraph fidelity_integration {
+    rankdir=TB;
+    fontname="Helvetica";
+    node [fontname="Helvetica", fontsize=10];
+    edge [fontname="Helvetica", fontsize=8];
+    compound=true;
+    newrank=true;
+
+    // =====================================================================
+    // LAYER: Human / UI
+    // =====================================================================
+    subgraph cluster_human {
+        label="Human / Terminal";
+        style=filled;
+        fillcolor="#f0f0f0";
+        color="#999999";
+
+        human [label="Human User", shape=house, style=filled, fillcolor="#e8e8e8"];
+        terminal [label="Terminal\n(stdout)", shape=note, style=filled, fillcolor="#e8e8e8"];
+    }
+
+    // =====================================================================
+    // LAYER: Context Injection (mode-gated)
+    // =====================================================================
+    subgraph cluster_context {
+        label="Context Layer (what the LLM sees)";
+        style=filled;
+        fillcolor="#fff8e1";
+        color="#f9a825";
+
+        ctx_using [label="using-zerovector.md\n\"suggest crew mode\"\n(ALWAYS available)", shape=note, style=filled, fillcolor="#fff9c4"];
+        ctx_fidelity [label="fidelity-framework.md\n\"call update_fidelity\"\n(ALWAYS available)", shape=note, style=filled, fillcolor="#fff9c4"];
+        ctx_crew [label="crew-instructions.md\n\"MANDATORY update after\nevery delegation\"\n(CREW MODE ONLY)", shape=note, style=filled, fillcolor="#ffcc80"];
+        ctx_domain [label="domain-tuning.md\n(CREW MODE ONLY)", shape=note, style=filled, fillcolor="#ffcc80"];
+    }
+
+    // =====================================================================
+    // LAYER: Bundle Composition
+    // =====================================================================
+    subgraph cluster_composition {
+        label="Bundle Composition Layer";
+        style=filled;
+        fillcolor="#e8f5e9";
+        color="#43a047";
+
+        bundle_md [label="bundle.md\n(root)", shape=folder, style=filled, fillcolor="#c8e6c9"];
+        crew_behavior [label="zerovector-crew.yaml\n(includes fidelity +\ndirect declarations)", shape=folder, style=filled, fillcolor="#c8e6c9"];
+        fidelity_behavior [label="fidelity.yaml\n(standalone behavior)", shape=folder, style=filled, fillcolor="#c8e6c9"];
+    }
+
+    // =====================================================================
+    // LAYER: Mode Definitions
+    // =====================================================================
+    subgraph cluster_modes {
+        label="Mode Definitions";
+        style=filled;
+        fillcolor="#e3f2fd";
+        color="#1e88e5";
+
+        mode_crew [label="crew.md\ncrew-build.md\ncrew-platform.md\n...", shape=component, style=filled, fillcolor="#bbdefb"];
+        mode_tools [label="tools.safe:\n  update_fidelity\ndefault_action: block", shape=record, style=filled, fillcolor="#bbdefb"];
+    }
+
+    // =====================================================================
+    // LAYER: Root Session
+    // =====================================================================
+    subgraph cluster_root_session {
+        label="Root Session (Orchestrator)";
+        style=filled;
+        fillcolor="#fce4ec";
+        color="#e53935";
+
+        subgraph cluster_coordinator {
+            label="ModuleCoordinator";
+            style=dashed;
+            color="#e53935";
+
+            fidelity_state_root [label="FidelityState(A)\n(root session's state)", shape=cylinder, style=filled, fillcolor="#ffcdd2"];
+            hook_registry [label="HookRegistry\n(emit pipeline)", shape=octagon, style=filled, fillcolor="#ffcdd2"];
+            capability_reg [label="Capabilities\nzerovector.fidelity_state → A\nzerovector.update_fidelity → A.update", shape=record, style=filled, fillcolor="#ffcdd2"];
+        }
+
+        orchestrator_llm [label="Orchestrator LLM\n(follows crew-instructions.md\nif crew mode active)", shape=doubleoctagon, style=filled, fillcolor="#ef9a9a"];
+
+        subgraph cluster_hooks_root {
+            label="Registered Hooks";
+            style=dashed;
+            color="#c62828";
+
+            hook_fidelity [label="hooks-fidelity-reporter\npriority=50\nevents: tool:post, prompt:complete", shape=box, style=filled, fillcolor="#ef9a9a"];
+            hook_crew_gate [label="hooks-crew-gate\npriority=10\nevents: tool:post, prompt:complete\n[NOT YET WIRED]", shape=box, style="filled,dashed", fillcolor="#ef9a9a"];
+        }
+
+        subgraph cluster_tools_root {
+            label="Mounted Tools";
+            style=dashed;
+            color="#c62828";
+
+            tool_update_fidelity [label="update_fidelity\n(UpdateFidelityTool)", shape=box3d, style=filled, fillcolor="#ef9a9a"];
+        }
+    }
+
+    // =====================================================================
+    // LAYER: Child Sessions
+    // =====================================================================
+    subgraph cluster_child_sessions {
+        label="Child Sessions (Sub-Agents)";
+        style=filled;
+        fillcolor="#ede7f6";
+        color="#5e35b1";
+
+        child_critic [label="zerovector:critic\n(child session)\nOWN FidelityState(B)", shape=box, style=filled, fillcolor="#d1c4e9"];
+        child_builder [label="zerovector:builder\n(child session)\nOWN FidelityState(C)", shape=box, style=filled, fillcolor="#d1c4e9"];
+        child_other [label="intent-analyst\narchitect\nshipper\n(child sessions)", shape=box, style=filled, fillcolor="#d1c4e9"];
+    }
+
+    // =====================================================================
+    // LAYER: Kernel
+    // =====================================================================
+    subgraph cluster_kernel {
+        label="Amplifier Kernel (amplifier-core)";
+        style=filled;
+        fillcolor="#eceff1";
+        color="#546e7a";
+
+        emit_fn [label="HookRegistry.emit()\nSequential by priority\nShort-circuit on deny\nCollects inject_context\nDROPS continue+context_injection", shape=diamond, style=filled, fillcolor="#cfd8dc"];
+        process_hook [label="coordinator.process_hook_result()\nChecks action==\"inject_context\"\nRoutes user_message to display\nManages injection budget", shape=diamond, style=filled, fillcolor="#cfd8dc"];
+        session_mgr [label="AmplifierSession\nCreates coordinator per session\nLoads modules per config\nEmits session:fork for children", shape=box, style=filled, fillcolor="#cfd8dc"];
+    }
+
+    // =====================================================================
+    // LAYER: Recipe Engine (parallel path)
+    // =====================================================================
+    subgraph cluster_recipe {
+        label="Recipe Engine (Parallel Path)";
+        style=filled;
+        fillcolor="#f3e5f5";
+        color="#8e24aa";
+
+        recipe_convergence [label="fidelity-convergence.yaml\nwhile fidelity < target:\n  route → act → re-assess\nNO update_fidelity calls\nNO dashboard updates", shape=note, style=filled, fillcolor="#e1bee7"];
+    }
+
+    // =====================================================================
+    // EDGES: Data Flow
+    // =====================================================================
+
+    // Human ↔ Terminal
+    terminal -> human [label="ANSI dashboard\n(via stdout bypass)", color="#43a047", penwidth=2];
+
+    // Context → LLM
+    ctx_crew -> orchestrator_llm [label="convergence protocol\n(mode-gated)", style=bold, color="#f9a825"];
+    ctx_fidelity -> orchestrator_llm [label="scoring rubric\n(always)", color="#f9a825"];
+    ctx_using -> orchestrator_llm [label="\"suggest crew mode\"\n(always)", color="#f9a825"];
+
+    // Mode → Context availability
+    mode_crew -> ctx_crew [label="activates", style=dashed, color="#1e88e5"];
+    mode_crew -> ctx_domain [label="activates", style=dashed, color="#1e88e5"];
+    mode_tools -> tool_update_fidelity [label="safe: allowed", style=dashed, color="#1e88e5"];
+
+    // Bundle composition
+    bundle_md -> crew_behavior [label="includes"];
+    crew_behavior -> fidelity_behavior [label="includes\n(hooks NOT merged\ndue to kernel gap)", style=dashed, color="#e53935"];
+    crew_behavior -> hook_fidelity [label="direct declaration\n(workaround)", color="#43a047"];
+    crew_behavior -> tool_update_fidelity [label="direct declaration\n(workaround)", color="#43a047"];
+    fidelity_behavior -> hook_fidelity [label="declares\n(IGNORED by loader)", style=dotted, color="#999999"];
+
+    // Orchestrator LLM ↔ Tools
+    orchestrator_llm -> tool_update_fidelity [label="calls update_fidelity\n(IF it follows instructions)", color="#e53935", penwidth=2];
+    tool_update_fidelity -> fidelity_state_root [label="writes lens_scores\noverall, priority_gap", color="#e53935"];
+
+    // Tool call → Hook pipeline
+    tool_update_fidelity -> emit_fn [label="triggers\ntool:post event", color="#546e7a"];
+    orchestrator_llm -> emit_fn [label="triggers\nprompt:complete event", color="#546e7a"];
+
+    // Hook pipeline execution
+    emit_fn -> hook_crew_gate [label="priority 10\n(fires first)", color="#546e7a"];
+    emit_fn -> hook_fidelity [label="priority 50\n(fires second)", color="#546e7a"];
+
+    // Hook reads state
+    hook_fidelity -> capability_reg [label="reads\nfidelity_state", color="#5e35b1"];
+    hook_crew_gate -> capability_reg [label="reads\nmodes.active", color="#5e35b1", style=dashed];
+
+    // Hook output paths
+    hook_fidelity -> terminal [label="sys.stdout.write()\n(WORKS - bypasses kernel)", color="#43a047", penwidth=2];
+    hook_fidelity -> emit_fn [label="returns HookResult\naction=\"continue\"\ncontext_injection=routing_advice\n(DROPPED by kernel)", color="#e53935", penwidth=2, style=bold];
+
+    hook_crew_gate -> terminal [label="sys.stdout.write()\n(WORKS)", color="#43a047", penwidth=2];
+    hook_crew_gate -> emit_fn [label="returns HookResult\naction=\"continue\"\ncontext_injection=warning\n(DROPPED by kernel)", color="#e53935", penwidth=2, style=bold];
+
+    // emit → process
+    emit_fn -> process_hook [label="returns combined\nHookResult\n(context_injection=None)", color="#e53935", style=bold];
+
+    // Orchestrator ↔ Child sessions
+    orchestrator_llm -> child_critic [label="delegate()\n(spawns child session)", color="#5e35b1"];
+    orchestrator_llm -> child_builder [label="delegate()", color="#5e35b1"];
+    orchestrator_llm -> child_other [label="delegate()", color="#5e35b1"];
+
+    // Child session isolation
+    child_critic -> orchestrator_llm [label="returns JSON scores\nin text output\n(NOT via capability)", color="#5e35b1"];
+
+    // Session manager creates sessions
+    session_mgr -> fidelity_state_root [label="mount() creates\nper-session state", style=dashed, color="#546e7a"];
+
+    // Recipe parallel path
+    recipe_convergence -> child_critic [label="uses critic\nfor assessment", style=dashed, color="#8e24aa"];
+    recipe_convergence -> child_builder [label="uses builder\nfor gap closure", style=dashed, color="#8e24aa"];
+
+    // =====================================================================
+    // LEGEND
+    // =====================================================================
+    subgraph cluster_legend {
+        label="Legend";
+        style=filled;
+        fillcolor="white";
+        color="black";
+
+        legend [shape=none, label=<
+            <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0">
+                <TR><TD BGCOLOR="#43a047"><FONT COLOR="white">Green</FONT></TD><TD>Working data path</TD></TR>
+                <TR><TD BGCOLOR="#e53935"><FONT COLOR="white">Red</FONT></TD><TD>Broken / fragile data path</TD></TR>
+                <TR><TD BGCOLOR="#5e35b1"><FONT COLOR="white">Purple</FONT></TD><TD>Session boundary crossing</TD></TR>
+                <TR><TD BGCOLOR="#f9a825">Gold</TD><TD>Context injection (mode-gated)</TD></TR>
+                <TR><TD BGCOLOR="#546e7a"><FONT COLOR="white">Gray</FONT></TD><TD>Kernel infrastructure</TD></TR>
+                <TR><TD BGCOLOR="#8e24aa"><FONT COLOR="white">Purple dashed</FONT></TD><TD>Recipe parallel path</TD></TR>
+                <TR><TD>Dashed box</TD><TD>Not yet wired / ignored</TD></TR>
+            </TABLE>
+        >];
+    }
+}

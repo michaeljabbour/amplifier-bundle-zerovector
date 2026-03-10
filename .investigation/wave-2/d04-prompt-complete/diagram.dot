@@ -1,0 +1,157 @@
+digraph D04_PromptComplete {
+    rankdir=TB;
+    node [fontname="Helvetica", fontsize=11];
+    edge [fontname="Helvetica", fontsize=10];
+
+    // ─── SUBGRAPHS ─────────────────────────────────────────────────────────────
+
+    subgraph cluster_app_layer {
+        label="App Layer  (amplifier_app_cli/main.py)";
+        style=filled;
+        fillcolor="#f0f4ff";
+        color="#6688cc";
+        fontsize=13;
+
+        user_input [label="User input / CLI prompt", shape=parallelogram, style=filled, fillcolor="#d0d8ff"];
+        session_execute [label="await session.execute(prompt)", shape=box, style=filled, fillcolor="#b8c8ff"];
+        emit_prompt_complete [label="await hooks.emit(PROMPT_COMPLETE, ...)\n[line 1628 / 1873]\n⚠ return value DISCARDED", shape=box, style=filled, fillcolor="#ffddaa", color="#cc6600", penwidth=2];
+        emit_session_end [label="await hooks.emit(SESSION_END, ...)\n[line 1748 / 1994]", shape=box, style=filled, fillcolor="#ffe0e0"];
+    }
+
+    subgraph cluster_orchestrator {
+        label="Orchestrator  (loop-streaming/__init__.py)";
+        style=filled;
+        fillcolor="#f0fff0";
+        color="#44aa44";
+        fontsize=13;
+
+        emit_prompt_submit [label="hooks.emit(PROMPT_SUBMIT)\n[line 163]\nresult processed", shape=box, style=filled, fillcolor="#ccffcc"];
+        emit_session_start [label="hooks.emit('session:start')\n[line 173]", shape=box, style=filled, fillcolor="#e0ffe0"];
+
+        loop_start [label="Iteration loop\n(while max_iter == -1 or iter < max)", shape=diamond, style=filled, fillcolor="#eeffee"];
+
+        emit_provider_request [label="result = hooks.emit(PROVIDER_REQUEST)\n[line 205]\n✓ result captured\n✓ coordinator.process_hook_result() called\n✓ ephemeral injection handled [lines 222-260]", shape=box, style=filled, fillcolor="#aaffaa", color="#228822", penwidth=2];
+
+        provider_call [label="provider.complete(chat_request)\n[line 353]", shape=box, style=filled, fillcolor="#e0ffe0"];
+
+        tool_decision [label="tool_calls?", shape=diamond, style=filled, fillcolor="#eeffee"];
+
+        emit_tool_pre [label="hooks.emit(TOOL_PRE)\n[line 777]\n✓ result captured, deny supported", shape=box, style=filled, fillcolor="#ccffcc"];
+        emit_tool_post [label="result = hooks.emit(TOOL_POST)\n[line 830]\n✓ result captured\n✓ coordinator.process_hook_result() called\nBUT ephemeral stored only if action='inject_context'\n[lines 846-857]", shape=box, style=filled, fillcolor="#ccffcc"];
+        emit_tool_error [label="hooks.emit(TOOL_ERROR)\n[lines 797, 870]", shape=box, style=filled, fillcolor="#ffe0e0"];
+
+        emit_orchestrator_complete [label="hooks.emit(ORCHESTRATOR_COMPLETE)\n[line 138]", shape=box, style=filled, fillcolor="#e0ffe0"];
+        emit_session_end_orch [label="hooks.emit('session:end')\n[line 668]", shape=box, style=filled, fillcolor="#e0ffe0"];
+
+        no_more_tools [label="No tool calls\n(text-only response)", shape=box, style=filled, fillcolor="#eeffee"];
+    }
+
+    subgraph cluster_hooks_registry {
+        label="HookRegistry.emit()  (amplifier_core/hooks.py)";
+        style=filled;
+        fillcolor="#fff8e0";
+        color="#cc9900";
+        fontsize=13;
+
+        call_handlers [label="Call each registered handler\n(by priority order)\n[line 145-173]", shape=box, style=filled, fillcolor="#fff0aa"];
+        check_inject_context [label="result.action == 'inject_context'\n AND result.context_injection ?\n[line 163]", shape=diamond, style=filled, fillcolor="#ffe066"];
+        collect_inject [label="inject_context_results.append(result)\n[line 164]", shape=box, style=filled, fillcolor="#aaffaa"];
+        drop_continue [label="❌ DROPPED\n'continue' results with context_injection\nare NEVER collected\n[hooks.py:163 — first drop point]", shape=box, style=filled, fillcolor="#ff6666", color="#cc0000", penwidth=2];
+        return_merged [label="return merged inject_context result\n[lines 177-183]", shape=box, style=filled, fillcolor="#aaffaa"];
+        return_continue [label="return HookResult(action='continue')\nNO context_injection\n[line 186]", shape=box, style=filled, fillcolor="#ffcccc"];
+    }
+
+    subgraph cluster_fidelity_reporter {
+        label="hooks-fidelity-reporter  (__init__.py)";
+        style=filled;
+        fillcolor="#fff0f8";
+        color="#cc44aa";
+        fontsize=13;
+
+        fidelity_handler [label="handle_event(event, data, coordinator)\n[line 278]", shape=box, style=filled, fillcolor="#ffccee"];
+        fidelity_return [label="return HookResult(\n  action='continue',   ← ⚠ BUG\n  context_injection=ephemeral_text,\n  ephemeral=True,\n  user_message=dashboard\n)\n[lines 310-317]", shape=box, style=filled, fillcolor="#ff99cc", color="#cc0066", penwidth=2];
+        fidelity_events [label="Registered on:\n• tool:post  [line 356]\n• prompt:complete  [line 357]", shape=box, style=filled, fillcolor="#ffddee"];
+    }
+
+    subgraph cluster_coordinator {
+        label="ModuleCoordinator  (coordinator.py)";
+        style=filled;
+        fillcolor="#f8f0ff";
+        color="#8844cc";
+        fontsize=13;
+
+        process_hook_result [label="process_hook_result(result, event, hook_name)\n[line 342]", shape=box, style=filled, fillcolor="#ddaaff"];
+        check_inject_action [label="result.action == 'inject_context'\nAND result.context_injection ?\n[line 361]", shape=diamond, style=filled, fillcolor="#cc88ff"];
+        handle_injection [label="_handle_context_injection()\n[line 378]\nif not ephemeral: context.add_message()", shape=box, style=filled, fillcolor="#aaaaff"];
+        coordinator_drop [label="❌ DROPPED\ncontinue + context_injection\nnever reaches here\n(third drop point)", shape=box, style=filled, fillcolor="#dd88dd", color="#880088"];
+    }
+
+    subgraph cluster_pending {
+        label="Pending Ephemeral Injections\n(orchestrator state)";
+        style=filled;
+        fillcolor="#f0fff8";
+        color="#449988";
+        fontsize=13;
+
+        orch_check [label="post_result.action == 'inject_context'\nAND post_result.ephemeral\nAND post_result.context_injection ?\n[lines 846-850]", shape=diamond, style=filled, fillcolor="#aaffdd"];
+        store_pending [label="_pending_ephemeral_injections.append()\n[line 851]\nApplied on next provider:request [lines 263-297]", shape=box, style=filled, fillcolor="#aaffcc"];
+        orch_drop [label="❌ DROPPED\naction='continue' fails check\n(second drop point)", shape=box, style=filled, fillcolor="#ff9988", color="#cc4400"];
+    }
+
+    // ─── EDGES ─────────────────────────────────────────────────────────────────
+
+    // App layer flow
+    user_input -> session_execute;
+    session_execute -> emit_prompt_submit [label="calls orchestrator.execute()"];
+    session_execute -> emit_prompt_complete [label="after execute() returns", style=dashed, color="#cc6600"];
+    emit_prompt_complete -> emit_session_end [color="#888888"];
+
+    // Orchestrator flow
+    emit_prompt_submit -> emit_session_start;
+    emit_session_start -> loop_start;
+    loop_start -> emit_provider_request;
+    emit_provider_request -> provider_call;
+    provider_call -> tool_decision;
+    tool_decision -> emit_tool_pre [label="yes, tools"];
+    tool_decision -> no_more_tools [label="no tools"];
+    emit_tool_pre -> provider_call [label="execute tool"];
+    emit_tool_pre -> emit_tool_post;
+    emit_tool_post -> loop_start [label="continue loop"];
+    emit_tool_post -> orch_check;
+    provider_call -> emit_tool_error [label="on error", style=dashed, color="#cc4400"];
+    no_more_tools -> emit_orchestrator_complete;
+    emit_orchestrator_complete -> emit_session_end_orch;
+
+    // Fidelity reporter registration
+    fidelity_events -> fidelity_handler [label="fires on tool:post\nor prompt:complete"];
+    fidelity_handler -> fidelity_return;
+
+    // Hook registry processing
+    emit_tool_post -> call_handlers [label="dispatches to registry"];
+    emit_prompt_complete -> call_handlers [label="dispatches to registry"];
+    emit_provider_request -> call_handlers [label="dispatches to registry"];
+    fidelity_return -> call_handlers [label="handler returns\naction='continue'", color="#cc0066"];
+    call_handlers -> check_inject_context;
+    check_inject_context -> collect_inject [label="yes\n(action='inject_context')"];
+    check_inject_context -> drop_continue [label="NO\n(action='continue')\n← fidelity reporter lands here", color="#cc0000"];
+    collect_inject -> return_merged;
+    drop_continue -> return_continue [label="nothing collected"];
+    return_merged -> process_hook_result [label="orchestrator captures result"];
+    return_continue -> process_hook_result [label="orchestrator captures result\n(no injection inside)"];
+
+    // Coordinator processing
+    process_hook_result -> check_inject_action;
+    check_inject_action -> handle_injection [label="yes"];
+    check_inject_action -> coordinator_drop [label="no (already dropped\nat hooks.emit level)"];
+
+    // Orchestrator pending check
+    orch_check -> store_pending [label="yes\n(inject_context+ephemeral)"];
+    orch_check -> orch_drop [label="no\n(continue action)"];
+
+    // prompt:complete specific note
+    emit_prompt_complete -> drop_continue [label="return value never\nreaches process_hook_result()", style=dotted, color="#cc6600"];
+
+    // Annotations
+    note_fix [label="✅ FIX PATH:\n1. Change fidelity reporter action to 'inject_context'\n2. Register on 'provider:request' (not 'prompt:complete')\n   provider:request result IS processed by coordinator", shape=note, style=filled, fillcolor="#ddffdd", color="#226622"];
+    store_pending -> note_fix [style=invis];
+}

@@ -1,0 +1,163 @@
+digraph provider_request_design {
+    rankdir=TB;
+    fontname="Helvetica";
+    node [fontname="Helvetica", fontsize=10];
+    edge [fontname="Helvetica", fontsize=9];
+    label="NEW-01: provider:request Design for Fidelity Reporter\n(Integration Boundaries & Data Flow)";
+    labelloc=t;
+    compound=true;
+
+    // =====================================================================
+    // ORCHESTRATOR LOOP
+    // =====================================================================
+    subgraph cluster_orchestrator {
+        label="Orchestrator Loop\n(amplifier-module-loop-streaming/__init__.py)";
+        style=rounded;
+        color="#4A90D9";
+        fontcolor="#4A90D9";
+
+        iter_start [label="iteration start\n(line 196)", shape=ellipse, style=filled, fillcolor="#E8F0FE"];
+        emit_pr [label="hooks.emit(\nPROVIDER_REQUEST,\n{provider, iteration})\n(line 205-206)", shape=box, style="filled,rounded", fillcolor="#FFF3CD"];
+        coord_process [label="coordinator.\nprocess_hook_result()\n(line 208-211)", shape=box, style="filled,rounded", fillcolor="#FFF3CD"];
+        check_deny [label="action ==\n\"deny\"?", shape=diamond, style=filled, fillcolor="#F8D7DA"];
+        get_messages [label="context.\nget_messages_for_request()\n(line 218)", shape=box, style="filled,rounded", fillcolor="#D4EDDA"];
+        check_inject [label="action ==\n\"inject_context\"\n& ephemeral?", shape=diamond, style=filled, fillcolor="#D4EDDA"];
+        append_ephemeral [label="append injection\nto message_dicts\n(lines 222-260)", shape=box, style="filled,rounded", fillcolor="#D4EDDA"];
+        apply_pending [label="apply pending\ntool:post injections\n(lines 262-297)", shape=box, style="filled,rounded", fillcolor="#D4EDDA"];
+        send_llm [label="send to LLM\nprovider", shape=ellipse, style=filled, fillcolor="#E8F0FE"];
+
+        iter_start -> emit_pr;
+        emit_pr -> coord_process;
+        coord_process -> check_deny;
+        check_deny -> get_messages [label="no"];
+        check_deny -> iter_start [label="yes\n(denied)", style=dashed, color=red];
+        get_messages -> check_inject;
+        check_inject -> append_ephemeral [label="yes"];
+        check_inject -> apply_pending [label="no"];
+        append_ephemeral -> apply_pending;
+        apply_pending -> send_llm;
+    }
+
+    // =====================================================================
+    // HOOK REGISTRY (merge boundary)
+    // =====================================================================
+    subgraph cluster_hooks {
+        label="Hook Registry — emit() merge logic\n(amplifier-core/hooks.py:111-186)";
+        style=rounded;
+        color="#E67E22";
+        fontcolor="#E67E22";
+
+        handler_chain [label="Execute handlers\nby priority\n(lower = earlier)", shape=box, style="filled,rounded", fillcolor="#FDEBD0"];
+        collect_inject [label="Collect\ninject_context\nresults\n(line 162-164)", shape=box, style="filled,rounded", fillcolor="#FDEBD0"];
+        merge [label="Merge:\ncontent joined by \\n\\n\nrole/ephemeral from FIRST\n(line 188-219)", shape=box, style="filled,bold,rounded", fillcolor="#F9E79F"];
+        return_result [label="Return single\nmerged HookResult", shape=ellipse, style=filled, fillcolor="#FDEBD0"];
+
+        handler_chain -> collect_inject;
+        collect_inject -> merge;
+        merge -> return_result;
+    }
+
+    // =====================================================================
+    // HOOKS (todo-reminder + fidelity-reporter)
+    // =====================================================================
+    subgraph cluster_todo {
+        label="hooks-todo-reminder\n(priority 10)";
+        style=rounded;
+        color="#27AE60";
+        fontcolor="#27AE60";
+
+        todo_handler [label="on_provider_request\naction=\"inject_context\"\nrole=\"user\"\nephemeral=True\nappend_to_last_tool=True", shape=box, style="filled,rounded", fillcolor="#D5F5E3"];
+        todo_state [label="coordinator.\ntodo_state", shape=cylinder, style=filled, fillcolor="#D5F5E3"];
+
+        todo_state -> todo_handler [label="getattr()"];
+    }
+
+    subgraph cluster_fidelity_hook {
+        label="hooks-fidelity-reporter\n(PROPOSED: priority 20)";
+        style="rounded,bold";
+        color="#8E44AD";
+        fontcolor="#8E44AD";
+
+        fid_pr_handler [label="on_provider_request\n(NEW)\naction=\"inject_context\"\nrole=\"user\"\nephemeral=True", shape=box, style="filled,bold,rounded", fillcolor="#E8DAEF"];
+        fid_tp_handler [label="on_tool_post\n(CHANGED)\naction=\"continue\"\ndashboard only\nNO injection", shape=box, style="filled,rounded", fillcolor="#E8DAEF"];
+        fid_pc_handler [label="on_prompt_complete\n(REMOVED)\ndead handler", shape=box, style="filled,rounded", fillcolor="#FADBD8", fontcolor="#C0392B"];
+        fid_state [label="coordinator.\nget_capability(\n\"zerovector.\nfidelity_state\")", shape=cylinder, style=filled, fillcolor="#E8DAEF"];
+
+        fid_state -> fid_pr_handler [label="get_state()"];
+        fid_state -> fid_tp_handler [label="get_state()"];
+    }
+
+    // =====================================================================
+    // FIDELITY STATE TOOL
+    // =====================================================================
+    subgraph cluster_fidelity_tool {
+        label="tool-fidelity-state\n(capability provider)";
+        style=rounded;
+        color="#2980B9";
+        fontcolor="#2980B9";
+
+        fidelity_state_obj [label="FidelityState\ndataclass\nlens_scores, overall,\ntarget, domain,\npriority_gap", shape=box3d, style=filled, fillcolor="#D6EAF8"];
+        update_tool [label="update_fidelity\ntool\n(LLM-callable)", shape=box, style="filled,rounded", fillcolor="#D6EAF8"];
+
+        update_tool -> fidelity_state_obj [label="state.\nupdate_fidelity()"];
+    }
+
+    // =====================================================================
+    // SKILLS / CONTEXT
+    // =====================================================================
+    subgraph cluster_context {
+        label="Context & Skills";
+        style=rounded;
+        color="#95A5A6";
+        fontcolor="#95A5A6";
+
+        crew_routing [label="crew-routing.md\n(always loaded)\n~37 lines", shape=note, style=filled, fillcolor="#EAECEE"];
+        fidelity_skill [label="fidelity-framework\nskill\n(on-demand)", shape=note, style="filled,dashed", fillcolor="#EAECEE"];
+    }
+
+    // =====================================================================
+    // COORDINATOR
+    // =====================================================================
+    subgraph cluster_coordinator {
+        label="ModuleCoordinator\n(amplifier-core/coordinator.py)";
+        style=rounded;
+        color="#D35400";
+        fontcolor="#D35400";
+
+        validate_size [label="Size limit\n10,240 bytes\n(line 128)", shape=box, style="filled,rounded", fillcolor="#FAD7A0"];
+        check_budget [label="Budget check\n10,000 tokens/turn\nWARNING only\n(line 117)", shape=box, style="filled,rounded", fillcolor="#FAD7A0"];
+        skip_ephemeral [label="ephemeral=True?\nskip context store\n(line 411-412)", shape=diamond, style=filled, fillcolor="#FAD7A0"];
+
+        validate_size -> check_budget -> skip_ephemeral;
+    }
+
+    // =====================================================================
+    // CROSS-BOUNDARY EDGES
+    // =====================================================================
+
+    // Orchestrator -> Hook Registry
+    emit_pr -> handler_chain [label="emit(PROVIDER_REQUEST)", lhead=cluster_hooks, style=bold, color="#E67E22"];
+
+    // Hook Registry -> Handlers (priority order)
+    handler_chain -> todo_handler [label="priority 10\n(first)", color="#27AE60"];
+    handler_chain -> fid_pr_handler [label="priority 20\n(second)", color="#8E44AD", style=bold];
+
+    // Hook Registry -> Orchestrator (merged result)
+    return_result -> coord_process [label="merged\nHookResult", style=bold, color="#E67E22"];
+
+    // Orchestrator -> Coordinator
+    coord_process -> validate_size [label="process_hook_result()", lhead=cluster_coordinator, color="#D35400"];
+
+    // Capability registration
+    fidelity_state_obj -> fid_state [label="register_capability()\n\"zerovector.fidelity_state\"", style=dashed, color="#2980B9"];
+
+    // Skills interaction
+    fid_pr_handler -> crew_routing [label="injection references\nskill loading", style=dotted, color="#95A5A6"];
+    crew_routing -> fidelity_skill [label="\"During fidelity\nassessments\"", style=dotted, color="#95A5A6"];
+
+    // Dashboard output (tool:post path)
+    fid_tp_handler -> send_llm [label="stdout dashboard\n(visual only,\nno injection)", style=dashed, color="#8E44AD"];
+
+    // Removed handler
+    fid_pc_handler -> iter_start [label="DEAD: orchestrator\nnever emits\nprompt:complete", style=dotted, color=red];
+}

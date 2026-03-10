@@ -1,0 +1,153 @@
+// Context Injection Chain: How Fidelity Instructions Reach the LLM
+// Agent: Behavior Observer (WHAT) — team-beta-context-injection
+//
+// Legend:
+//   Blue boxes = Context files (static text injected into LLM context)
+//   Green boxes = Composition manifests (behavior YAML, bundle.md)
+//   Orange boxes = Mode files (active when /crew-* activated)
+//   Red boxes = Agent files (active in child sessions only)
+//   Purple boxes = Runtime modules (hooks, tools)
+//   Diamond = The critical instruction ("call update_fidelity")
+//   Dashed edges = "Read X" text reference (not structural injection)
+
+digraph context_injection_chain {
+    rankdir=TB;
+    fontname="Helvetica";
+    node [fontname="Helvetica", fontsize=10];
+    edge [fontsize=8];
+    compound=true;
+
+    // ===== COMPOSITION LAYER (GREEN) =====
+    subgraph cluster_composition {
+        label="Composition Layer\n(what includes what)";
+        style=filled;
+        fillcolor="#f0fff0";
+        color="#228B22";
+
+        bundle_md [label="bundle.md\n(root)\n118 lines, 4.9KB\n12× 'fidelity'\n0× 'update_fidelity'", shape=box, style=filled, fillcolor="#90EE90"];
+
+        behavior_crew [label="zerovector-crew.yaml\n38 lines, 1.1KB\n7× 'fidelity'", shape=box, style=filled, fillcolor="#90EE90"];
+
+        behavior_fidelity [label="fidelity.yaml\n40 lines, 1.2KB\n13× 'fidelity'", shape=box, style=filled, fillcolor="#90EE90"];
+    }
+
+    // ===== CONTEXT FILES (BLUE) =====
+    subgraph cluster_context {
+        label="Context Files\n(injected into root LLM session)";
+        style=filled;
+        fillcolor="#f0f0ff";
+        color="#4169E1";
+
+        ctx_principles [label="zerovector-principles.md\n105 lines, 4.1KB\n2× 'fidelity'\n0× 'update_fidelity'\nPhilosophy only", shape=box, style=filled, fillcolor="#ADD8E6"];
+
+        ctx_crew_inst [label="crew-instructions.md\n345 lines, 15.5KB\n43× 'fidelity'\n11× 'update_fidelity'\n<CRITICAL> MANDATORY section\nPRIMARY INSTRUCTION SOURCE", shape=box, style=filled, fillcolor="#6495ED", fontcolor=white];
+
+        ctx_domain [label="domain-tuning.md\n454 lines, 17.6KB\n57× 'fidelity'\n0× 'update_fidelity'\nScoring criteria only", shape=box, style=filled, fillcolor="#ADD8E6"];
+
+        ctx_fidelity_fw [label="fidelity-framework.md\n225 lines, 11.9KB\n7× 'fidelity'\n4× 'update_fidelity'\nSECONDARY INSTRUCTION SOURCE", shape=box, style=filled, fillcolor="#6495ED", fontcolor=white];
+
+        ctx_using [label="using-zerovector.md\n55 lines, 2.7KB\n3× 'fidelity'\nPre-mode gate only", shape=box, style=filled, fillcolor="#ADD8E6"];
+    }
+
+    // ===== MODE FILES (ORANGE) =====
+    subgraph cluster_modes {
+        label="Mode Files (6)\n(1 active at a time in root session)";
+        style=filled;
+        fillcolor="#fff8f0";
+        color="#FF8C00";
+
+        mode_crew [label="crew.md\n184 lines\n20× 'fidelity'\nupdate_fidelity in safe tools", shape=box, style=filled, fillcolor="#FFA500"];
+        mode_build [label="crew-build.md\n156 lines", shape=box, style=filled, fillcolor="#FFA500"];
+        mode_product [label="crew-product.md\n150 lines", shape=box, style=filled, fillcolor="#FFA500"];
+        mode_platform [label="crew-platform.md\n167 lines", shape=box, style=filled, fillcolor="#FFA500"];
+        mode_research [label="crew-research.md\n164 lines", shape=box, style=filled, fillcolor="#FFA500"];
+        mode_content [label="crew-content.md\n164 lines", shape=box, style=filled, fillcolor="#FFA500"];
+    }
+
+    // ===== AGENT FILES (RED) =====
+    subgraph cluster_agents {
+        label="Agent Files (5)\n(run in CHILD sessions — isolated from context)";
+        style=filled;
+        fillcolor="#fff0f0";
+        color="#DC143C";
+
+        agent_critic [label="critic.md\n304 lines, 11.7KB\n15× 'fidelity'\n'Do NOT call update_fidelity'\nProduces JSON scores", shape=box, style=filled, fillcolor="#FF6B6B"];
+        agent_intent [label="intent-analyst.md\n157 lines\n4× 'fidelity'\n0× 'update_fidelity'", shape=box, style=filled, fillcolor="#FFA07A"];
+        agent_architect [label="architect.md\n148 lines\n4× 'fidelity'\n0× 'update_fidelity'", shape=box, style=filled, fillcolor="#FFA07A"];
+        agent_builder [label="builder.md\n196 lines\n8× 'fidelity'\n0× 'update_fidelity'", shape=box, style=filled, fillcolor="#FFA07A"];
+        agent_shipper [label="shipper.md\n185 lines\n6× 'fidelity'\n0× 'update_fidelity'", shape=box, style=filled, fillcolor="#FFA07A"];
+    }
+
+    // ===== RUNTIME MODULES (PURPLE) =====
+    subgraph cluster_runtime {
+        label="Runtime Modules\n(programmatic, not LLM context)";
+        style=filled;
+        fillcolor="#f8f0ff";
+        color="#8B008B";
+
+        tool_fidelity [label="tool-fidelity-state\n198 lines\nMounts update_fidelity tool\nMaintains FidelityState", shape=box, style=filled, fillcolor="#DDA0DD"];
+
+        hook_reporter [label="hooks-fidelity-reporter\n383 lines\nRenders ANSI dashboard\nEphemeral context injection\n(only after 1st update)", shape=box, style=filled, fillcolor="#DDA0DD"];
+    }
+
+    // ===== THE CRITICAL INSTRUCTION (DIAMOND) =====
+    critical_instruction [label="\"call update_fidelity\nafter EVERY delegation\"\n(~300 tokens)", shape=diamond, style=filled, fillcolor="#FFD700", width=2.5];
+
+    // ===== COMPOSITION EDGES =====
+    bundle_md -> behavior_crew [label="includes"];
+    behavior_crew -> behavior_fidelity [label="includes\n(transitive)"];
+
+    // ===== BUNDLE @INCLUDES =====
+    bundle_md -> ctx_principles [label="@include\n(Layer 1)", color="#4169E1"];
+    bundle_md -> ctx_crew_inst [label="@include\n(Layer 1)", color="#4169E1"];
+    bundle_md -> ctx_domain [label="@include\n(Layer 1)", color="#4169E1"];
+
+    // ===== BEHAVIOR CONTEXT INCLUDES =====
+    behavior_crew -> ctx_using [label="context include\n(Layer 2)", color="#228B22"];
+    behavior_crew -> ctx_crew_inst [label="context include\n(Layer 2)", color="#228B22"];
+    behavior_crew -> ctx_domain [label="context include\n(Layer 2)", color="#228B22"];
+    behavior_fidelity -> ctx_using [label="context include\n(Layer 2)", color="#228B22"];
+    behavior_fidelity -> ctx_fidelity_fw [label="context include\n(Layer 2)", color="#228B22"];
+
+    // ===== MODE TEXT REFERENCES =====
+    mode_crew -> ctx_crew_inst [label="'Read...'", style=dashed, color="#FF8C00"];
+    mode_crew -> ctx_fidelity_fw [label="'Read...'", style=dashed, color="#FF8C00"];
+    mode_crew -> ctx_domain [label="'Read...'", style=dashed, color="#FF8C00"];
+    // (other 5 modes have same references — omitted for clarity)
+
+    // ===== MODE TOOL POLICY =====
+    mode_crew -> tool_fidelity [label="safe tool:\nupdate_fidelity", style=dotted, color="#8B008B"];
+    mode_build -> tool_fidelity [label="safe tool", style=dotted, color="#8B008B"];
+    mode_product -> tool_fidelity [label="safe tool", style=dotted, color="#8B008B"];
+    mode_platform -> tool_fidelity [label="safe tool", style=dotted, color="#8B008B"];
+    mode_research -> tool_fidelity [label="safe tool", style=dotted, color="#8B008B"];
+    mode_content -> tool_fidelity [label="safe tool", style=dotted, color="#8B008B"];
+
+    // ===== BEHAVIOR DECLARATIONS =====
+    behavior_crew -> tool_fidelity [label="declares tool\n(duplicate)", color="#8B008B"];
+    behavior_crew -> hook_reporter [label="declares hook\n(duplicate)", color="#8B008B"];
+    behavior_fidelity -> tool_fidelity [label="declares tool", color="#8B008B"];
+    behavior_fidelity -> hook_reporter [label="declares hook", color="#8B008B"];
+    behavior_fidelity -> agent_critic [label="includes agent", color="#DC143C"];
+    behavior_crew -> agent_intent [label="includes agent", color="#DC143C"];
+    behavior_crew -> agent_architect [label="includes agent", color="#DC143C"];
+    behavior_crew -> agent_builder [label="includes agent", color="#DC143C"];
+    behavior_crew -> agent_shipper [label="includes agent", color="#DC143C"];
+
+    // ===== THE CRITICAL PATH =====
+    ctx_crew_inst -> critical_instruction [label="<CRITICAL>\nMANDATORY section\n(lines 133-196)", color="#FF0000", penwidth=3];
+    ctx_fidelity_fw -> critical_instruction [label="'Calling update_fidelity'\nsection (lines 172-203)", color="#FF0000", penwidth=2];
+
+    // ===== RUNTIME FLOW =====
+    tool_fidelity -> hook_reporter [label="FidelityState\ncapability read", color="#8B008B", style=dashed];
+
+    // ===== ISOLATION BARRIER =====
+    subgraph cluster_barrier {
+        label="SESSION BOUNDARY\nSub-agents cannot see context files,\nmode files, or behavior context";
+        style=dashed;
+        color="#DC143C";
+        fontcolor="#DC143C";
+
+        barrier_note [label="Orchestrator must MANUALLY\npass fidelity context to agents\nvia delegation instruction text", shape=note, style=filled, fillcolor="#FFFACD"];
+    }
+}

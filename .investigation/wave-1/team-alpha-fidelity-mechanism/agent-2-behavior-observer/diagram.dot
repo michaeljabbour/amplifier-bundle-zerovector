@@ -1,0 +1,208 @@
+// Fidelity Mechanism: Instruction Flow & Failure Points
+// Agent: Behavior Observer (WHAT)
+// Shows: Who tells whom to call update_fidelity, and where it breaks
+
+digraph fidelity_mechanism {
+    rankdir=TB;
+    fontname="Helvetica";
+    node [fontname="Helvetica", fontsize=11];
+    edge [fontname="Helvetica", fontsize=9];
+
+    // === CONTEXT FILES (instruction sources) ===
+    subgraph cluster_context {
+        label="Context Files Loaded Into LLM\n(~51KB total)";
+        style=filled;
+        fillcolor="#f0f0f0";
+        color="#999999";
+
+        crew_instructions [
+            label="crew-instructions.md\n15,462 bytes\n6 fidelity instructions\nincl. CRITICAL block",
+            shape=note,
+            style=filled,
+            fillcolor="#ffdddd"
+        ];
+
+        fidelity_framework [
+            label="fidelity-framework.md\n11,941 bytes\n1 'call update_fidelity'\ngeneric guidance",
+            shape=note,
+            style=filled,
+            fillcolor="#ffffdd"
+        ];
+
+        domain_tuning [
+            label="domain-tuning.md\n17,566 bytes\nscoring criteria only\nno call instructions",
+            shape=note,
+            style=filled,
+            fillcolor="#ddffdd"
+        ];
+
+        using_zv [
+            label="using-zerovector.md\n2,657 bytes\n'suggest crew mode'\nsoft nudge",
+            shape=note,
+            style=filled,
+            fillcolor="#ddddff"
+        ];
+    }
+
+    // === MODE FILES (tool enablement) ===
+    subgraph cluster_modes {
+        label="Mode Files (6 total)\nAll list update_fidelity in tools.safe";
+        style=filled;
+        fillcolor="#e8f4e8";
+        color="#66aa66";
+
+        crew_mode [label="crew.md", shape=box];
+        crew_build [label="crew-build.md", shape=box];
+        crew_product [label="crew-product.md", shape=box];
+        crew_platform [label="crew-platform.md", shape=box];
+        crew_research [label="crew-research.md", shape=box];
+        crew_content [label="crew-content.md", shape=box];
+    }
+
+    // === LLM ROLES ===
+    subgraph cluster_llm {
+        label="LLM Session Roles";
+        style=filled;
+        fillcolor="#fff8e8";
+        color="#cc9933";
+
+        orchestrator [
+            label="LLM as Orchestrator\n(root session)\nSHOULD call update_fidelity\nafter EVERY delegation",
+            shape=ellipse,
+            style="filled,bold",
+            fillcolor="#ffcc66"
+        ];
+
+        critic_sub [
+            label="LLM as Critic\n(child session)\nShould NOT call\nupdate_fidelity",
+            shape=ellipse,
+            style=filled,
+            fillcolor="#ffcc66"
+        ];
+
+        other_agents [
+            label="LLM as Other Agents\n(child sessions)\nNo fidelity responsibility",
+            shape=ellipse,
+            style=filled,
+            fillcolor="#ffcc66"
+        ];
+    }
+
+    // === RUNTIME MODULES ===
+    subgraph cluster_system_a {
+        label="System A: Tool-Based Tracking\n(interactive crew sessions)";
+        style=filled;
+        fillcolor="#e8e8ff";
+        color="#6666cc";
+
+        update_fidelity_tool [
+            label="update_fidelity\n(LLM-callable tool)",
+            shape=box3d,
+            style=filled,
+            fillcolor="#ccccff"
+        ];
+
+        fidelity_state [
+            label="FidelityState\n(coordinator capability)\nzerovector.fidelity_state",
+            shape=cylinder,
+            style=filled,
+            fillcolor="#ccccff"
+        ];
+
+        reporter_hook [
+            label="hooks-fidelity-reporter\n(fires on tool:post,\nprompt:complete)",
+            shape=hexagon,
+            style=filled,
+            fillcolor="#ccccff"
+        ];
+
+        dashboard [
+            label="ANSI Dashboard\n(visible to user)",
+            shape=box,
+            style="filled,bold",
+            fillcolor="#aaffaa"
+        ];
+
+        ephemeral [
+            label="Ephemeral Context\n(injected to LLM)",
+            shape=box,
+            style=filled,
+            fillcolor="#aaffaa"
+        ];
+    }
+
+    subgraph cluster_system_b {
+        label="System B: Recipe-Based Tracking\n(automated recipe runs)";
+        style=filled;
+        fillcolor="#ffe8e8";
+        color="#cc6666";
+
+        recipe_context [
+            label="{{fidelity_score}}\n{{target_fidelity}}\n(recipe context vars)",
+            shape=cylinder,
+            style=filled,
+            fillcolor="#ffcccc"
+        ];
+
+        while_loop [
+            label="while_condition:\nfidelity_score < target",
+            shape=diamond,
+            style=filled,
+            fillcolor="#ffcccc"
+        ];
+    }
+
+    // === FAILURE POINTS ===
+    subgraph cluster_failures {
+        label="Known Failure Points\n(from 8 fix commits)";
+        style=filled;
+        fillcolor="#fff0f0";
+        color="#cc3333";
+        
+        fail_tool_blocked [label="F1: Tool blocked\nby mode policy\n(fix: 55866e1)", shape=octagon, style=filled, fillcolor="#ff9999"];
+        fail_double_fire [label="F2: Critic + orchestrator\nboth call it\n(fix: 9a49682, b2a15a1)", shape=octagon, style=filled, fillcolor="#ff9999"];
+        fail_hooks_missing [label="F3: Hooks not loaded\n(transitive include bug)\n(fix: 6a0999e)", shape=octagon, style=filled, fillcolor="#ff9999"];
+        fail_frozen_dash [label="F4: Dashboard frozen\nat 0.00\n(fix: 1ed8932)", shape=octagon, style=filled, fillcolor="#ff9999"];
+        fail_no_mode [label="F5: No crew mode\nactivated at all\n(partially fixed)", shape=octagon, style=filled, fillcolor="#ff9999"];
+        fail_mount [label="F6: Module mount\nasync/URI bugs\n(fix: 1315378, a485862)", shape=octagon, style=filled, fillcolor="#ff9999"];
+    }
+
+    // === EDGES: Instruction Flow ===
+    crew_instructions -> orchestrator [label="CRITICAL:\ncall after\nevery delegation", color="#cc0000", penwidth=2];
+    fidelity_framework -> orchestrator [label="generic:\ncall after\nassessment", color="#666666", style=dashed];
+    fidelity_framework -> critic_sub [label="ambiguous:\n'after completing\nassessment'", color="#cc6600", style=dashed];
+
+    // Critic contradiction
+    critic_sub -> update_fidelity_tool [label="BLOCKED by\ncritic.md line 263:\n'do NOT call'", color="#cc0000", style=dashed, arrowhead=tee];
+
+    // Mode enablement
+    crew_mode -> update_fidelity_tool [label="safe tool", color="#66aa66"];
+
+    // Happy path
+    orchestrator -> update_fidelity_tool [label="calls after\neach delegation", color="#006600", penwidth=2];
+    update_fidelity_tool -> fidelity_state [label="writes scores", color="#006600"];
+    reporter_hook -> fidelity_state [label="reads state", color="#0000cc"];
+    reporter_hook -> dashboard [label="renders", color="#0000cc"];
+    reporter_hook -> ephemeral [label="injects", color="#0000cc"];
+
+    // Recipe system (disconnected)
+    recipe_context -> while_loop [label="evaluates"];
+
+    // Failure edges
+    crew_mode -> fail_tool_blocked [style=dotted, color="#cc3333"];
+    critic_sub -> fail_double_fire [style=dotted, color="#cc3333"];
+    reporter_hook -> fail_hooks_missing [style=dotted, color="#cc3333"];
+    orchestrator -> fail_frozen_dash [style=dotted, color="#cc3333"];
+    using_zv -> fail_no_mode [style=dotted, color="#cc3333"];
+    fidelity_state -> fail_mount [style=dotted, color="#cc3333"];
+
+    // No connection between systems
+    fidelity_state -> recipe_context [
+        label="NO SHARED STATE\n(disconnected systems)",
+        color="#cc0000",
+        style=dashed,
+        arrowhead=tee,
+        arrowtail=tee,
+        dir=both
+    ];
+}

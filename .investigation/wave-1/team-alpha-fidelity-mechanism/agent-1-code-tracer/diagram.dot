@@ -1,0 +1,202 @@
+digraph fidelity_mechanism {
+    // =========================================================================
+    // Graph settings
+    // =========================================================================
+    rankdir=TB;
+    compound=true;
+    fontname="Helvetica";
+    fontsize=11;
+    node [fontname="Helvetica", fontsize=10, shape=box, style=filled];
+    edge [fontname="Helvetica", fontsize=9];
+
+    // =========================================================================
+    // SUBGRAPH: Bundle composition
+    // =========================================================================
+    subgraph cluster_bundle {
+        label="Bundle Composition (zerovector bundle.md)";
+        style=dashed;
+        color="#888888";
+        bgcolor="#f9f9f9";
+
+        bundle_md [label="bundle.md\n(zerovector root)", shape=note, fillcolor="#e8e8e8"];
+        behavior_crew [label="behaviors/zerovector-crew.yaml", shape=note, fillcolor="#ddeeff"];
+        behavior_fidelity [label="behaviors/fidelity.yaml", shape=note, fillcolor="#ddeeff"];
+
+        bundle_md -> behavior_crew [label="includes", style=dashed];
+        behavior_crew -> behavior_fidelity [label="includes\n(transitive —\nhooks NOT merged\nper commit 6a0999e)", style=dashed, color="#cc6600", fontcolor="#cc6600"];
+    }
+
+    // =========================================================================
+    // SUBGRAPH: Behavior declarations
+    // =========================================================================
+    subgraph cluster_declarations {
+        label="Hook Declarations in Behavior YAMLs";
+        style=dashed;
+        color="#cc3333";
+        bgcolor="#fff0f0";
+
+        decl_crew_reporter [label="zerovector-crew.yaml:15\nhooks-fidelity-reporter (direct)", fillcolor="#ffdddd"];
+        decl_fidelity_reporter [label="fidelity.yaml:26\nhooks-fidelity-reporter (direct)", fillcolor="#ffdddd"];
+        decl_crew_tool [label="zerovector-crew.yaml:23\ntool-fidelity-state (direct)", fillcolor="#ffeecc"];
+        decl_fidelity_tool [label="fidelity.yaml:30\ntool-fidelity-state (direct)", fillcolor="#ffeecc"];
+
+        WARNING_DOUBLE [label="⚠ BUG-2: BOTH behaviors declare\nhooks-fidelity-reporter.\nIf both hooks sections load,\nDOUBLE registration occurs.",
+            shape=diamond, fillcolor="#ff4444", fontcolor="white", style=filled];
+        decl_crew_reporter -> WARNING_DOUBLE [arrowhead=none, style=dotted, color="#cc0000"];
+        decl_fidelity_reporter -> WARNING_DOUBLE [arrowhead=none, style=dotted, color="#cc0000"];
+
+        NOTE_CREWGATE [label="⚠ BUG-4: hooks-crew-gate\nNOT declared in any behavior.\nUntracked. Never loaded.",
+            shape=diamond, fillcolor="#ff4444", fontcolor="white", style=filled];
+    }
+
+    // =========================================================================
+    // SUBGRAPH: Session initialization (kernel)
+    // =========================================================================
+    subgraph cluster_session_init {
+        label="AmplifierSession.initialize() — session.py:95";
+        style=filled;
+        bgcolor="#f0f0ff";
+
+        init_start [label="session.initialize()", shape=ellipse, fillcolor="#ccccff"];
+        load_tools [label="Load tools (session.py:173)\nModuleLoader.load('tool-fidelity-state')", fillcolor="#ccddff"];
+        mount_tool [label="tool_fidelity_state.mount(coordinator)\n→ FidelityState(target=0.85, domain='general')\n→ UpdateFidelityTool(state)\n→ coordinator.mount('tools', tool, name='update_fidelity')\n→ coordinator.register_capability('zerovector.fidelity_state', state)\n→ coordinator.register_capability('zerovector.update_fidelity', state.update_fidelity)", fillcolor="#aaccff"];
+        load_hooks [label="Load hooks (session.py:193)\nModuleLoader.load('hooks-fidelity-reporter')", fillcolor="#ccddff"];
+        mount_reporter [label="hooks_fidelity_reporter.mount(coordinator, priority=50)\n→ coordinator.hooks.register('tool:post', handler, priority=50)\n→ coordinator.hooks.register('prompt:complete', handler, priority=50)\n→ returns cleanup()", fillcolor="#aaccff"];
+
+        init_start -> load_tools -> mount_tool -> load_hooks -> mount_reporter;
+    }
+
+    // =========================================================================
+    // SUBGRAPH: Runtime state (heap objects)
+    // =========================================================================
+    subgraph cluster_runtime {
+        label="Runtime Objects (Python heap, session-scoped)";
+        style=filled;
+        bgcolor="#f0fff0";
+
+        cap_registry [label="coordinator._capabilities\n(plain dict)", fillcolor="#ccffcc"];
+        fidelity_state [label="FidelityState\n  lens_scores: dict[str,float]  {}\n  overall: float  0.0\n  target: float   0.85\n  domain: str     'general'\n  priority_gap: dict  {}", fillcolor="#99ee99"];
+        tool_instance [label="UpdateFidelityTool\n  .state → FidelityState (same obj)\n  .name = 'update_fidelity'", fillcolor="#aaddaa"];
+        hook_registry [label="HookRegistry\n  _handlers: defaultdict(list)\n  'tool:post' → [fidelity-reporter @ P50]\n  'prompt:complete' → [fidelity-reporter @ P50]", fillcolor="#ccffcc"];
+
+        cap_registry -> fidelity_state [label="'zerovector.fidelity_state'"];
+        cap_registry -> tool_instance [label="(via mount_points['tools'])"];
+        tool_instance -> fidelity_state [label=".state (same obj)"];
+    }
+
+    // =========================================================================
+    // SUBGRAPH: Event dispatch — tool:post (happy path)
+    // =========================================================================
+    subgraph cluster_tool_post {
+        label="Event: tool:post — after update_fidelity executes";
+        style=filled;
+        bgcolor="#fffaf0";
+
+        agent_calls [label="LLM calls update_fidelity\n(lens_scores={intent_clarity:0.7,...})", shape=ellipse, fillcolor="#ffe0a0"];
+        tool_pre [label="hooks.emit('tool:pre', data)\n(no fidelity handlers registered)", fillcolor="#f0f0f0"];
+        tool_exec [label="UpdateFidelityTool.execute(input)\n  → FidelityState.update_fidelity(lens_scores, domain, target)\n    → clamps each score: max(0.0, min(1.0, v))\n    → overall = sum(scores) / len(scores)\n    → lowest = min(scores, key=scores.get)\n    → priority_gap = {lens, score, recommendation}\n  → returns ToolResult('Fidelity NEEDS_WORK: overall=0.62')", fillcolor="#ffe0a0"];
+        emit_tool_post [label="hooks.emit('tool:post', data)", fillcolor="#ffe0a0"];
+        handler_called [label="fidelity-reporter-tool:post handler called\n(priority 50)", fillcolor="#ffe0a0"];
+        get_cap [label="coordinator.get_capability('zerovector.fidelity_state')\n→ FidelityState instance", fillcolor="#ffe0a0"];
+        get_state [label="fidelity_state.get_state()\n→ dict copy (lens_scores, overall, target, domain, priority_gap)", fillcolor="#ffe0a0"];
+        render_dash [label="render_dashboard(state)\n→ ANSI multi-line box string", fillcolor="#ffe0a0"];
+        write_stdout [label="sys.stdout.write(dashboard)\n← TERMINAL OUTPUT (works)", fillcolor="#99ff99", shape=box3d];
+        render_eph [label="render_ephemeral(state)\n→ plain text '[FIDELITY STATE — ephemeral]\\n...'", fillcolor="#ffe0a0"];
+        return_result [label="return HookResult(\n  action='continue',          ← BUG-1\n  context_injection=ephemeral_text,\n  ephemeral=True,\n  user_message=dashboard\n)", fillcolor="#ffaaaa"];
+
+        agent_calls -> tool_pre -> tool_exec -> emit_tool_post -> handler_called;
+        handler_called -> get_cap -> get_state -> render_dash -> write_stdout;
+        get_state -> render_eph -> return_result;
+    }
+
+    // =========================================================================
+    // SUBGRAPH: emit() processing — the bug
+    // =========================================================================
+    subgraph cluster_emit_process {
+        label="HookRegistry.emit() processes result — hooks.py:145";
+        style=filled;
+        bgcolor="#fff0f0";
+
+        emit_checks [label="emit() checks result.action:", fillcolor="#f0f0f0"];
+        check_deny [label="action=='deny'?\n→ No (action='continue')", fillcolor="#ffeeee"];
+        check_modify [label="action=='modify'?\n→ No", fillcolor="#ffeeee"];
+        check_inject [label="action=='inject_context'?\n→ NO (action='continue')\n→ context_injection IGNORED\n← BUG-1", fillcolor="#ff8888", shape=diamond];
+        check_ask [label="action=='ask_user'?\n→ No", fillcolor="#ffeeee"];
+        final_return [label="emit() returns\nHookResult(action='continue')\n← context_injection=None\n← user_message=None\n← ephemeral routing advice LOST", fillcolor="#ff6666", fontcolor="white"];
+
+        inject_context_results_empty [label="inject_context_results=[]\n(never populated)\nNo merge attempted", fillcolor="#ffcccc"];
+
+        emit_checks -> check_deny -> check_modify -> check_inject;
+        check_inject -> inject_context_results_empty;
+        check_inject -> check_ask;
+        check_ask -> final_return;
+        inject_context_results_empty -> final_return [style=dashed];
+    }
+
+    // =========================================================================
+    // SUBGRAPH: prompt:complete (second firing)
+    // =========================================================================
+    subgraph cluster_prompt_complete {
+        label="Event: prompt:complete — end of LLM turn";
+        style=filled;
+        bgcolor="#f5f0ff";
+
+        llm_turn_end [label="LLM turn completes", shape=ellipse, fillcolor="#ddccff"];
+        emit_pc [label="hooks.emit('prompt:complete', data)", fillcolor="#ddccff"];
+        pc_handler [label="fidelity-reporter-prompt:complete handler called\n(SAME handle_event() — second firing per turn)", fillcolor="#ffaaff"];
+        pc_result [label="Same path: stdout write + return\nHookResult(action='continue', ...)\n← BUG-1 applies again\n← context_injection dropped again", fillcolor="#ff88ff"];
+
+        llm_turn_end -> emit_pc -> pc_handler -> pc_result;
+    }
+
+    // =========================================================================
+    // SUBGRAPH: hooks-crew-gate (undeployed)
+    // =========================================================================
+    subgraph cluster_crew_gate {
+        label="hooks-crew-gate — NEVER LOADED (BUG-4)";
+        style=dashed;
+        color="#888888";
+        bgcolor="#eeeeee";
+
+        gate_mount [label="CrewGate.mount() — never called", fillcolor="#cccccc", style=filled, color="#888888"];
+        gate_on_prompt [label="on_prompt_complete()\n→ _is_mode_active() checks 3 capability names\n→ if no mode: return HookResult(..., user_message_level='warn')\n                                   ↑ BUG-3: Pydantic ValidationError\n→ except: return _CONTINUE\n← always no-ops when mode inactive", fillcolor="#cccccc", style=filled, color="#888888"];
+        gate_on_tool [label="on_tool_post()\n→ _is_creation_tool() checks tool_name\n→ if creation tool without mode: sets _creation_detected=True\n→ return HookResult(..., user_message_level='warn')\n                           ↑ BUG-3: Pydantic ValidationError\n→ except: return _CONTINUE", fillcolor="#cccccc", style=filled, color="#888888"];
+
+        gate_mount -> gate_on_prompt [style=dashed];
+        gate_mount -> gate_on_tool [style=dashed];
+    }
+
+    // =========================================================================
+    // Cross-subgraph edges (inter-cluster)
+    // =========================================================================
+    bundle_md -> init_start [label="app layer loads\nbehavior hooks", lhead=cluster_session_init, ltail=cluster_bundle, style=dashed];
+    decl_crew_reporter -> mount_reporter [label="declares\nhooks-fidelity-reporter", lhead=cluster_session_init, ltail=cluster_declarations, style=dashed];
+    decl_crew_tool -> load_tools [label="declares\ntool-fidelity-state", lhead=cluster_session_init, ltail=cluster_declarations, style=dashed];
+
+    mount_tool -> cap_registry [label="registers capabilities", lhead=cluster_runtime, ltail=cluster_session_init];
+    mount_reporter -> hook_registry [label="registers handlers", lhead=cluster_runtime, ltail=cluster_session_init];
+
+    agent_calls -> fidelity_state [label="mutates via\nupdate_fidelity()", lhead=cluster_runtime, ltail=cluster_tool_post, style=dashed];
+    get_cap -> cap_registry [label="reads from", lhead=cluster_runtime, ltail=cluster_tool_post, style=dashed];
+    return_result -> emit_checks [lhead=cluster_emit_process, ltail=cluster_tool_post];
+
+    emit_tool_post -> emit_pc [style=invis];  // layout hint
+    emit_pc -> llm_turn_end [style=invis, dir=back];  // layout hint
+
+    // =========================================================================
+    // Legend
+    // =========================================================================
+    subgraph cluster_legend {
+        label="Legend";
+        style=filled;
+        bgcolor="#ffffff";
+        rank=sink;
+
+        l1 [label="Green border = working correctly", shape=plaintext, fillcolor=white];
+        l2 [label="Red fill = bug / failure path", shape=plaintext, fillcolor=white];
+        l3 [label="Gray fill = never executed", shape=plaintext, fillcolor=white];
+        l4 [label="Dashed edge = declarative/config relationship", shape=plaintext, fillcolor=white];
+        l5 [label="Solid edge = runtime call", shape=plaintext, fillcolor=white];
+        l1 -> l2 -> l3 -> l4 -> l5 [style=invis];
+    }
+}

@@ -1,0 +1,163 @@
+// Behavior Observer: Todo vs Fidelity Tool Architecture Comparison
+// Shows the feedback loop structure, deployment level, and UI surfaces
+
+digraph todo_vs_fidelity {
+    rankdir=TB;
+    fontname="Helvetica";
+    node [fontname="Helvetica", fontsize=10];
+    edge [fontname="Helvetica", fontsize=9];
+    compound=true;
+    newrank=true;
+
+    // =========================================================================
+    // TODO TOOL ECOSYSTEM (Left Side)
+    // =========================================================================
+    subgraph cluster_todo {
+        label="TODO TOOL ECOSYSTEM\n(Foundation-Level, Always-On)";
+        style=filled;
+        fillcolor="#e8f5e9";
+        color="#2e7d32";
+        fontsize=12;
+        fontcolor="#2e7d32";
+
+        // Prompt Reinforcement Layer
+        subgraph cluster_todo_prompts {
+            label="Prompt Reinforcement (5 layers)";
+            style=dashed;
+            color="#66bb6a";
+            fillcolor="#f1f8e9";
+
+            tp1 [label="common-agent-base.md\n\"Use the todo tool\"", shape=note, fillcolor="#c8e6c9", style=filled];
+            tp2 [label="common-agent-base.md\n\"IMPORTANT: Always use\"", shape=note, fillcolor="#c8e6c9", style=filled];
+            tp3 [label="foundation/bundle.md\n\"IMPORTANT: For anything\nmore than trivial tasks\"", shape=note, fillcolor="#a5d6a7", style=filled];
+            tp4 [label="foundation/bundle.md\n\"VERY IMPORTANT:\ncode behind todo tool\"", shape=note, fillcolor="#81c784", style=filled];
+        }
+
+        // Core Components
+        todo_tool [label="tool-todo\n(3 actions:\ncreate/update/list)", shape=box3d, fillcolor="#66bb6a", style=filled, fontcolor=white];
+        todo_hook [label="hooks-todo-reminder\nprovider:request\npriority: 10\n(BEFORE LLM call)", shape=hexagon, fillcolor="#43a047", style=filled, fontcolor=white];
+        todo_state [label="coordinator.todo_state\n(flat list of items)", shape=cylinder, fillcolor="#e8f5e9", style=filled];
+
+        // Adaptive Nudge
+        todo_nudge [label="Adaptive Nudge:\n\"hasn't been used recently\"\n(5th reinforcement layer)", shape=diamond, fillcolor="#fff9c4", style=filled];
+
+        // UI Surfaces
+        subgraph cluster_todo_ui {
+            label="UI Surfaces (4)";
+            style=dashed;
+            color="#66bb6a";
+            fillcolor="#f1f8e9";
+
+            todo_ui1 [label="LLM Context\n(ephemeral injection\nevery turn)", shape=box, fillcolor="#c8e6c9", style=filled];
+            todo_ui2 [label="TUI Panel\n(Textual widget\ndocked right)", shape=box, fillcolor="#c8e6c9", style=filled];
+            todo_ui3 [label="Desktop GUI\n(Zustand store\nReact component)", shape=box, fillcolor="#c8e6c9", style=filled];
+            todo_ui4 [label="WebSocket\n(real-time sync\n+ persistence)", shape=box, fillcolor="#c8e6c9", style=filled];
+        }
+
+        // Closed Loop Edges
+        todo_tool -> todo_state [label="writes", color="#2e7d32", penwidth=2];
+        todo_state -> todo_hook [label="reads", color="#2e7d32", penwidth=2];
+        todo_hook -> todo_nudge [label="checks\nrecent usage", color="#ff8f00", style=dashed];
+        todo_nudge -> todo_ui1 [label="injects\nif needed", color="#ff8f00", style=dashed];
+        todo_hook -> todo_ui1 [label="injects\nstatus", color="#2e7d32", penwidth=2];
+        todo_state -> todo_ui2 [label="renders", color="#666666"];
+        todo_state -> todo_ui3 [label="syncs", color="#666666"];
+        todo_state -> todo_ui4 [label="persists", color="#666666"];
+    }
+
+    // =========================================================================
+    // FIDELITY TOOL ECOSYSTEM (Right Side)
+    // =========================================================================
+    subgraph cluster_fidelity {
+        label="FIDELITY TOOL ECOSYSTEM\n(ZeroVector Bundle, Opt-In)";
+        style=filled;
+        fillcolor="#fce4ec";
+        color="#c62828";
+        fontsize=12;
+        fontcolor="#c62828";
+
+        // Prompt Reinforcement Layer
+        subgraph cluster_fidelity_prompts {
+            label="Prompt Reinforcement (1 layer + 1 contradictory)";
+            style=dashed;
+            color="#ef9a9a";
+            fillcolor="#ffebee";
+
+            fp1 [label="fidelity-framework.md\n\"Always call\nupdate_fidelity\"", shape=note, fillcolor="#ef9a9a", style=filled];
+            fp2 [label="critic.md\n\"You do NOT need\nto call update_fidelity\nyourself\"", shape=note, fillcolor="#ffcdd2", style=filled, fontcolor="#c62828"];
+        }
+
+        // Core Components
+        fidelity_tool [label="update_fidelity\n(5 lenses + domain\n+ target + evidence)", shape=box3d, fillcolor="#ef5350", style=filled, fontcolor=white];
+        fidelity_hook [label="hooks-fidelity-reporter\ntool:post + prompt:complete\npriority: 50\n(AFTER action)", shape=hexagon, fillcolor="#d32f2f", style=filled, fontcolor=white];
+        fidelity_state [label="zerovector.fidelity_state\n(FidelityState dataclass\n5 lenses + priority_gap)", shape=cylinder, fillcolor="#fce4ec", style=filled];
+
+        // Critic Agent
+        critic [label="zerovector:critic\n(two-pass protocol\nstructured JSON)", shape=oval, fillcolor="#ffcdd2", style=filled];
+
+        // No Nudge
+        no_nudge [label="No adaptive nudge\n(no usage tracking\nno reminder)", shape=diamond, fillcolor="#ffcdd2", style=filled, fontcolor="#c62828"];
+
+        // UI Surfaces
+        subgraph cluster_fidelity_ui {
+            label="UI Surfaces (2)";
+            style=dashed;
+            color="#ef9a9a";
+            fillcolor="#ffebee";
+
+            fid_ui1 [label="LLM Context\n(ephemeral injection\nrouting advice)", shape=box, fillcolor="#ffcdd2", style=filled];
+            fid_ui2 [label="ANSI Dashboard\n(stdout only\nno persistence)", shape=box, fillcolor="#ffcdd2", style=filled];
+        }
+
+        // Open Loop Edges
+        critic -> fidelity_tool [label="must call\n(LLM initiative)", color="#c62828", penwidth=2, style=dashed];
+        fidelity_tool -> fidelity_state [label="writes", color="#c62828", penwidth=2];
+        fidelity_state -> fidelity_hook [label="reads", color="#c62828", penwidth=2];
+        fidelity_hook -> fid_ui1 [label="injects\nadvice", color="#c62828", penwidth=1];
+        fidelity_hook -> fid_ui2 [label="renders\ndashboard", color="#666666"];
+        fidelity_hook -> no_nudge [label="never\nchecks", color="#999999", style=dotted];
+    }
+
+    // =========================================================================
+    // LLM (Center)
+    // =========================================================================
+    LLM [label="LLM\n(Agent)", shape=doubleoctagon, fillcolor="#e3f2fd", style=filled, fontsize=12];
+
+    // Todo closed loop (green, thick)
+    todo_ui1 -> LLM [label="sees status\nBEFORE responding", color="#2e7d32", penwidth=3, lhead=cluster_todo];
+    LLM -> todo_tool [label="updates todos\n(low cost)", color="#2e7d32", penwidth=3, ltail=cluster_todo];
+
+    // Fidelity open loop (red, dashed)
+    fid_ui1 -> LLM [label="sees advice\nAFTER acting", color="#c62828", penwidth=2, style=dashed];
+    LLM -> critic [label="must delegate\nto critic\n(high cost)", color="#c62828", penwidth=2, style=dashed];
+
+    // Prompt reinforcement arrows
+    tp4 -> LLM [label="4 prompt\nreinforcements", color="#388e3c", style=dotted, penwidth=1];
+    fp1 -> LLM [label="1 prompt\nreinforcement", color="#e53935", style=dotted, penwidth=1];
+
+    // =========================================================================
+    // Reliability Score Legend
+    // =========================================================================
+    subgraph cluster_legend {
+        label="Reliability Layers Comparison";
+        style=filled;
+        fillcolor="#f5f5f5";
+        color="#9e9e9e";
+        fontsize=11;
+
+        legend [label=<
+            <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4">
+            <TR><TD BGCOLOR="#e0e0e0"><B>Layer</B></TD><TD BGCOLOR="#c8e6c9"><B>Todo</B></TD><TD BGCOLOR="#ffcdd2"><B>Fidelity</B></TD></TR>
+            <TR><TD>Foundation deploy</TD><TD BGCOLOR="#c8e6c9">YES</TD><TD BGCOLOR="#ffcdd2">NO</TD></TR>
+            <TR><TD>Prompt mentions</TD><TD BGCOLOR="#c8e6c9">5</TD><TD BGCOLOR="#ffcdd2">1 (+1 contra)</TD></TR>
+            <TR><TD>Pre-action timing</TD><TD BGCOLOR="#c8e6c9">YES</TD><TD BGCOLOR="#ffcdd2">NO</TD></TR>
+            <TR><TD>Closed loop</TD><TD BGCOLOR="#c8e6c9">YES</TD><TD BGCOLOR="#ffcdd2">NO</TD></TR>
+            <TR><TD>Adaptive nudge</TD><TD BGCOLOR="#c8e6c9">YES</TD><TD BGCOLOR="#ffcdd2">NO</TD></TR>
+            <TR><TD>Low update cost</TD><TD BGCOLOR="#c8e6c9">YES</TD><TD BGCOLOR="#ffcdd2">NO</TD></TR>
+            <TR><TD>Multi-UI (4 vs 2)</TD><TD BGCOLOR="#c8e6c9">YES</TD><TD BGCOLOR="#ffcdd2">NO</TD></TR>
+            <TR><TD>Persistence</TD><TD BGCOLOR="#c8e6c9">YES</TD><TD BGCOLOR="#ffcdd2">NO</TD></TR>
+            <TR><TD COLSPAN="3" BGCOLOR="#eeeeee"><B>Score: 8/8 vs 0/8</B></TD></TR>
+            </TABLE>
+        >, shape=plaintext];
+    }
+}

@@ -1,0 +1,255 @@
+digraph amplifier_roadmap {
+  rankdir=TB
+  fontname="Helvetica Neue"
+  node [fontname="Helvetica Neue" fontsize=10 style=filled]
+  edge [fontname="Helvetica Neue" fontsize=9]
+  bgcolor="#1a1a2e"
+  label=<<B><FONT POINT-SIZE="20" COLOR="#e0e0e0">Amplifier Ecosystem Roadmap — Surgical Implementation Map</FONT></B><BR/><FONT POINT-SIZE="11" COLOR="#888888">Green = Exists │ Yellow = Partial │ Red = Missing │ Labels show target repo/layer</FONT>>
+  labelloc=t
+  pad=0.5
+  compound=true
+
+  // ═══════════════════════════════════════════════════════
+  //  LAYER 0: KERNEL (amplifier-core)
+  // ═══════════════════════════════════════════════════════
+
+  subgraph cluster_kernel {
+    label=<<B><FONT COLOR="#e0e0e0" POINT-SIZE="14">KERNEL — amplifier-core</FONT></B><BR/><FONT COLOR="#4ecca3" POINT-SIZE="10">Zero changes required for Pillars 1 &amp; 2. One candidate for Pillar 3.</FONT>>
+    style=rounded
+    color="#333366"
+    fontcolor="#e0e0e0"
+    bgcolor="#0d1117"
+
+    kernel_session [label="AmplifierSession\n+ mount_plan dict\n+ capability registry\n+ session fork" shape=component fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+    kernel_hooks [label="Hook System\n5 lifecycle events\nevent-first observability" shape=component fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+    kernel_modules [label="Module Protocols\nProvider│Tool│Hook\nOrchestrator│Context" shape=component fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+
+    // The ONE kernel candidate
+    kernel_exec_result [label="ExecutionResult\n(enrich execute()→str\nto execute()→Result)\n\nNeeded by: MCP server,\nHTTP gateway, SDK" shape=component fillcolor="#3a1a1a" fontcolor="#e94560" style="filled,dashed"]
+
+    kernel_session -> kernel_hooks [style=invis]
+    kernel_hooks -> kernel_modules [style=invis]
+    kernel_modules -> kernel_exec_result [style=invis]
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  LAYER 1: FOUNDATION (amplifier-foundation)
+  // ═══════════════════════════════════════════════════════
+
+  subgraph cluster_foundation {
+    label=<<B><FONT COLOR="#e0e0e0" POINT-SIZE="14">FOUNDATION — amplifier-foundation</FONT></B><BR/><FONT COLOR="#f0c040" POINT-SIZE="10">Mechanisms 80% built. DX tooling is the gap.</FONT>>
+    style=rounded
+    color="#333366"
+    fontcolor="#e0e0e0"
+    bgcolor="#0d1117"
+
+    // EXISTS
+    found_registry [label="BundleRegistry\nload│compose│cache\nnamespace resolution" shape=box3d fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+    found_compose [label="Bundle.compose()\ndeep merge rules\nthin bundle pattern" shape=box3d fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+    found_sources [label="Source Handlers\nGit│File│HTTP│Zip\nDiskCache at ~/.amplifier/" shape=box3d fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+    found_agents [label="Agent = Bundle\nshell-exec│file-ops\ngit-ops│explorer" shape=box3d fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+
+    // MISSING → foundation
+    found_strict [label="P0: Strict Mode\nWire existing strict=True\nto CLI flag (~50 LOC)" shape=box fillcolor="#3a2a1a" fontcolor="#f0c040" style="filled,bold"]
+    found_lock [label="P2: Lock File\nAuto-gen bundle.lock\nw/ resolved SHAs (~200 LOC)" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+    found_testing [label="SDK: amplifier.testing\nMockCoordinator│TestSession\nassert_tool_called (~500 LOC)" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+    found_workflow [label="Mode Workflow Engine\nReusable state machine\nfor mode progressions" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+
+    found_registry -> found_compose [style=invis]
+    found_compose -> found_sources [style=invis]
+    found_sources -> found_agents [style=invis]
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  PILLAR 1: RIGHT TOOL FOR JOB
+  // ═══════════════════════════════════════════════════════
+
+  subgraph cluster_pillar1 {
+    label=<<B><FONT COLOR="#e94560" POINT-SIZE="16">PILLAR 1: Right Tool for Job</FONT></B>>
+    style=rounded
+    color="#0f3460"
+    fontcolor="#e94560"
+    bgcolor="#0d1117"
+
+    subgraph cluster_p1_bundle_mgmt {
+      label=<<FONT COLOR="#ccc" POINT-SIZE="11">Bundle Management</FONT>>
+      style=rounded
+      color="#0f3460"
+      bgcolor="#16213e"
+
+      p1_add [label="✓ bundle add/list\nupdate/refresh" shape=box fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+      p1_inspect [label="P0: bundle inspect\nShow composed result\n→ app-cli (~150 LOC)" shape=box fillcolor="#3a2a1a" fontcolor="#f0c040" style="filled,bold"]
+      p1_catalog [label="P1: Discovery Catalog\nbundles.json static index\n→ app-cli (~100 LOC)" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+      p1_bundle_add [label="P1: bundle add <name>\nLookup manifest + write\ninclude → app-cli (~200 LOC)" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+      p1_scaffold [label="P2: bundle init\nGenerate thin bundle\nscaffold → app-cli" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+      p1_publish [label="P3: bundle publish\nRegister in catalog\n→ app-cli + service" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+    }
+
+    subgraph cluster_p1_compose {
+      label=<<FONT COLOR="#ccc" POINT-SIZE="11">Easier Composition</FONT>>
+      style=rounded
+      color="#0f3460"
+      bgcolor="#16213e"
+
+      p1_compose_exists [label="✓ Bundle.compose()\n✓ Thin bundle pattern\n✓ 22 examples" shape=box fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+      p1_compose_interactive [label="P2: amplifier compose\nInteractive guided\ncomposition → app-cli" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+      p1_compose_preview [label="P3: Composition diff\nPreview before commit\n→ app-cli + foundation" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+    }
+
+    subgraph cluster_p1_plugin {
+      label=<<FONT COLOR="#ccc" POINT-SIZE="11">Plugin / MCP / Skill</FONT>>
+      style=rounded
+      color="#0f3460"
+      bgcolor="#16213e"
+
+      p1_mcp [label="✓ tool-mcp\n(stdio + HTTP)" shape=box fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+      p1_skills [label="✓ tool-skills\n(list/search/load)" shape=box fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+      p1_mcp_add [label="P2: mcp add <name>\n→ app-cli + manifest" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+      p1_unified [label="P3: Unified plugin UX\nOne 'add capability'\nregardless of type" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  PILLAR 2: UX
+  // ═══════════════════════════════════════════════════════
+
+  subgraph cluster_pillar2 {
+    label=<<B><FONT COLOR="#a855f7" POINT-SIZE="16">PILLAR 2: UX</FONT></B>>
+    style=rounded
+    color="#533483"
+    fontcolor="#a855f7"
+    bgcolor="#0d1117"
+
+    subgraph cluster_p2_cli {
+      label=<<FONT COLOR="#ccc" POINT-SIZE="11">CLI Improvements</FONT>>
+      style=rounded
+      color="#533483"
+      bgcolor="#16213e"
+
+      p2_chat [label="✓ Interactive chat\n✓ Streaming UI\n✓ Session resume" shape=box fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+      p2_retry [label="P1: Auto-retry\n429/timeout recovery\n→ app-cli" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+      p2_tui [label="P1: TUI Interface\nPanels│scrollback\n→ new amplifier-app-tui" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+      p2_statusbar [label="P1: Bottom Status Bar\nModel│tokens│cost│time\n→ app-tui or app-cli" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+    }
+
+    subgraph cluster_p2_slash {
+      label=<<FONT COLOR="#ccc" POINT-SIZE="11">Slash Commands &amp; Modes</FONT>>
+      style=rounded
+      color="#533483"
+      bgcolor="#16213e"
+
+      p2_modes [label="✓ Mode system\n✓ tool-slash-command\n✓ /help /tools /agents" shape=box fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+      p2_palette [label="P2: Command Palette\nFuzzy-search /commands\n→ app-tui" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+      p2_cmd_create [label="P2: command create\nScaffold custom /cmds\n→ app-cli" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+    }
+
+    subgraph cluster_p2_system {
+      label=<<FONT COLOR="#ccc" POINT-SIZE="11">System Agent / Orchestration</FONT>>
+      style=rounded
+      color="#533483"
+      bgcolor="#16213e"
+
+      p2_bash [label="✓ tool-bash\n✓ execution-environments\n✓ foreman + observers" shape=box fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+      p2_sysadmin [label="P2: Unified sysadmin\nagent (processes, svc,\nnet, disk) → foundation" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+    }
+
+    subgraph cluster_p2_docs {
+      label=<<FONT COLOR="#ccc" POINT-SIZE="11">Formal Documentation</FONT>>
+      style=rounded
+      color="#533483"
+      bgcolor="#16213e"
+
+      p2_docs_exist [label="✓ Extensive docs\n✓ 22 code examples\n✓ Contract docs" shape=box fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+      p2_devmd [label="P0: Fix DEVELOPER.md\n'aspirational' → accurate\n→ amplifier repo" shape=box fillcolor="#3a2a1a" fontcolor="#f0c040" style="filled,bold"]
+      p2_hosted [label="P1: Hosted docs site\nSearchable│versioned\n→ build pipeline" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+      p2_tutorials [label="P2: Step-by-step\ntutorials (15-min builds)\n→ amplifier repo" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  PILLAR 3: SDK
+  // ═══════════════════════════════════════════════════════
+
+  subgraph cluster_pillar3 {
+    label=<<B><FONT COLOR="#38bdf8" POINT-SIZE="16">PILLAR 3: SDK</FONT></B>>
+    style=rounded
+    color="#1b6ca8"
+    fontcolor="#38bdf8"
+    bgcolor="#0d1117"
+
+    subgraph cluster_p3_agent_tool {
+      label=<<FONT COLOR="#ccc" POINT-SIZE="11">Agent → Tool Capabilities</FONT>>
+      style=rounded
+      color="#1b6ca8"
+      bgcolor="#16213e"
+
+      p3_task [label="✓ tool-task delegation\n✓ Agent = bundle\n✓ Spawn + preferences" shape=box fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+      p3_typed [label="P1: Agent-as-tool\nprotocol (typed I/O\nschemas) → core + found." shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+      p3_discovery [label="P2: Capability\ndiscovery (query agent\nfor tool schemas)" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+    }
+
+    subgraph cluster_p3_embed {
+      label=<<FONT COLOR="#ccc" POINT-SIZE="11">App Ecosystem Integration</FONT>>
+      style=rounded
+      color="#1b6ca8"
+      bgcolor="#16213e"
+
+      p3_guide [label="✓ Integration Guide\n✓ 4 protocol boundaries\n✓ 7 community apps" shape=box fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+      p3_sdk [label="P1: amplifier-sdk\npip install amplifier-sdk\n→ new repo" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+      p3_ref_apps [label="P1: Reference apps\nFastAPI + WebSocket\nVoice bridge → examples/" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+    }
+
+    subgraph cluster_p3_primitives {
+      label=<<FONT COLOR="#ccc" POINT-SIZE="11">Memory / Composition / Harness</FONT>>
+      style=rounded
+      color="#1b6ca8"
+      bgcolor="#16213e"
+
+      p3_ctx [label="✓ context-simple\n✓ context-persistent\n✓ Bundle composition API" shape=box fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+      p3_memory [label="P2: Memory as\ncore protocol\n→ amplifier-core" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+      p3_testing_h [label="P1: Testing harness\nMock│Assert│Capture\n→ foundation" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+    }
+
+    subgraph cluster_p3_service {
+      label=<<FONT COLOR="#ccc" POINT-SIZE="11">Amp as MCP / Gateway / Service</FONT>>
+      style=rounded
+      color="#1b6ca8"
+      bgcolor="#16213e"
+
+      p3_mcp_client [label="✓ MCP client\n(tool-mcp)" shape=box fillcolor="#1a3a2a" fontcolor="#4ecca3"]
+      p3_mcp_server [label="P1: Amplifier as\nMCP server\n→ new module/app" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+      p3_gateway [label="P2: HTTP/gRPC\ngateway service\n→ new amplifier-app-server" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+      p3_multitenant [label="P3: Multi-tenant\nservice + auth + RBAC\n→ new app" shape=box fillcolor="#3a1a1a" fontcolor="#e94560"]
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  DEPENDENCY EDGES
+  // ═══════════════════════════════════════════════════════
+
+  // Foundation supports Pillar 1
+  found_registry -> p1_add [color="#4ecca355" style=dashed lhead=cluster_p1_bundle_mgmt]
+  found_compose -> p1_compose_exists [color="#4ecca355" style=dashed lhead=cluster_p1_compose]
+
+  // Foundation supports Pillar 2
+  found_agents -> p2_bash [color="#4ecca355" style=dashed lhead=cluster_p2_system]
+
+  // Kernel supports SDK
+  kernel_session -> p3_task [color="#4ecca355" style=dashed lhead=cluster_p3_agent_tool]
+  kernel_exec_result -> p3_mcp_server [color="#e9456055" style=dashed label="  enables" fontcolor="#e94560"]
+  kernel_exec_result -> p3_gateway [color="#e9456055" style=dashed label="  enables" fontcolor="#e94560"]
+
+  // Cross-pillar dependencies
+  p1_catalog -> p1_bundle_add [color="#e9456088" label=" requires" fontcolor="#e94560"]
+  p1_bundle_add -> p1_scaffold [color="#e9456055" style=dashed]
+  p2_tui -> p2_statusbar [color="#a855f788" label=" contains" fontcolor="#a855f7"]
+  p2_tui -> p2_palette [color="#a855f788" label=" contains" fontcolor="#a855f7"]
+  p3_sdk -> p3_ref_apps [color="#38bdf888" label=" enables" fontcolor="#38bdf8"]
+  p3_typed -> p3_discovery [color="#38bdf888" label=" enables" fontcolor="#38bdf8"]
+  p3_mcp_server -> p3_gateway [color="#38bdf888" label=" sequence" fontcolor="#38bdf8"]
+  p3_gateway -> p3_multitenant [color="#38bdf888" label=" extends" fontcolor="#38bdf8"]
+  found_strict -> p1_inspect [color="#f0c04088" label=" pair" fontcolor="#f0c040"]
+
+  // SDK depends on P1 composition maturity
+  p1_compose_exists -> p3_sdk [color="#ffffff22" style=dashed label="  composition\n  primitives" fontcolor="#888"]
+}

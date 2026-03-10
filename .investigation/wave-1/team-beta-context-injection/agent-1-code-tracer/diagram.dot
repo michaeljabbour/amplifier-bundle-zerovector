@@ -1,0 +1,211 @@
+digraph context_injection_chain {
+    // Graph settings
+    rankdir=TB;
+    splines=ortho;
+    node [fontname="Helvetica", fontsize=11, shape=box, style="rounded,filled"];
+    edge [fontname="Helvetica", fontsize=9];
+
+    // =====================================================================
+    // LAYER 1: Bundle composition (pre-session, build-time)
+    // =====================================================================
+    subgraph cluster_composition {
+        label="Bundle Composition (foundation/bundle.py:61–146)";
+        style="dashed";
+        color="#888888";
+        bgcolor="#f9f9f9";
+        fontsize=12;
+
+        bundle_md [label="bundle.md\n(root bundle)", fillcolor="#4A90D9", fontcolor="white"];
+        crew_behavior [label="behaviors/zerovector-crew.yaml\n(zerovector-crew behavior)", fillcolor="#4A90D9", fontcolor="white"];
+        fidelity_behavior [label="behaviors/fidelity.yaml\n(fidelity behavior)", fillcolor="#4A90D9", fontcolor="white"];
+        foundation_bundle [label="amplifier-foundation bundle\n(git+github/amplifier-foundation)", fillcolor="#7B68EE", fontcolor="white"];
+
+        bundle_md -> crew_behavior [label="includes (bundle.md:9)"];
+        bundle_md -> foundation_bundle [label="includes (bundle.md:8)"];
+        crew_behavior -> fidelity_behavior [label="includes (zerovector-crew.yaml:10)"];
+    }
+
+    // =====================================================================
+    // LAYER 2: Context files (accumulated during compose())
+    // =====================================================================
+    subgraph cluster_context_files {
+        label="Context Files Accumulated by Bundle.compose()";
+        style="dashed";
+        color="#888888";
+        bgcolor="#fff7e6";
+        fontsize=12;
+
+        ctx_principles [label="context/zerovector-principles.md\n(@mention in bundle.md:29)", fillcolor="#F5A623", fontcolor="white"];
+        ctx_crew_instr [label="context/crew-instructions.md\n(@mention bundle.md:30 +\ncrew-yaml:36)", fillcolor="#F5A623", fontcolor="white"];
+        ctx_domain [label="context/domain-tuning.md\n(@mention bundle.md:31 +\ncrew-yaml:37)", fillcolor="#F5A623", fontcolor="white"];
+        ctx_fidelity [label="context/fidelity-framework.md\n(fidelity.yaml:40)\n★ ALWAYS PRESENT ★", fillcolor="#E67E00", fontcolor="white", penwidth=3];
+        ctx_using [label="context/using-zerovector.md\n(crew-yaml:35 + fidelity.yaml:39)", fillcolor="#F5A623", fontcolor="white"];
+        ctx_modes_instr [label="modes:context/modes-instructions.md\n(crew-yaml:38)", fillcolor="#F5A623", fontcolor="white"];
+        ctx_common [label="foundation:context/shared/common-system-base.md\n(@mention bundle.md:118)", fillcolor="#7B68EE", fontcolor="white"];
+
+        bundle_md -> ctx_principles [label="@mention resolved", style=dotted];
+        bundle_md -> ctx_crew_instr [label="@mention resolved", style=dotted];
+        bundle_md -> ctx_domain [label="@mention resolved", style=dotted];
+        bundle_md -> ctx_common [label="@mention resolved", style=dotted];
+        crew_behavior -> ctx_using [label="context.include", style=dotted];
+        crew_behavior -> ctx_modes_instr [label="context.include", style=dotted];
+        fidelity_behavior -> ctx_fidelity [label="context.include", style=dotted, penwidth=2];
+        fidelity_behavior -> ctx_using [label="context.include (dedup)", style=dotted];
+    }
+
+    // =====================================================================
+    // LAYER 3: Session initialization (PreparedBundle.create_session)
+    // =====================================================================
+    subgraph cluster_session_init {
+        label="Session Init: PreparedBundle.create_session() (bundle.py:464–596)";
+        style="dashed";
+        color="#888888";
+        bgcolor="#e8f5e9";
+        fontsize=12;
+
+        mention_resolver [label="BaseMentionResolver\n(mentions/resolver.py:12–76)\nresolves @namespace:path", fillcolor="#27AE60", fontcolor="white"];
+        mention_loader [label="load_mentions()\n(mentions/loader.py:72–171)\nrecursive, max_depth=3", fillcolor="#27AE60", fontcolor="white"];
+        deduplicator [label="ContentDeduplicator\n(dedup by path)", fillcolor="#27AE60", fontcolor="white"];
+        format_ctx [label="format_context_block()\n(mentions/loader.py:15–69)\nwraps in <context_file> XML", fillcolor="#27AE60", fontcolor="white"];
+        system_msg [label="{'role': 'system', 'content': final_instruction}\ncontext_manager.add_message()\n(bundle.py:592–594)", fillcolor="#1A7A45", fontcolor="white", shape=note];
+    }
+
+    // Context files flow into session init
+    ctx_principles -> mention_loader [label="read + dedup"];
+    ctx_crew_instr -> mention_loader [label="read + dedup"];
+    ctx_domain -> mention_loader [label="read + dedup"];
+    ctx_fidelity -> mention_loader [label="read + dedup", penwidth=2];
+    ctx_using -> mention_loader [label="read + dedup"];
+    ctx_modes_instr -> mention_loader [label="read + dedup"];
+    ctx_common -> mention_loader [label="read + dedup"];
+
+    mention_loader -> deduplicator;
+    mention_loader -> mention_resolver [label="resolves @mentions"];
+    deduplicator -> format_ctx;
+    format_ctx -> system_msg [label="prepend context block\n(bundle.py:586–594)"];
+
+    // =====================================================================
+    // LAYER 4: Module mounting (AmplifierSession.initialize)
+    // =====================================================================
+    subgraph cluster_modules {
+        label="Module Mounting: session.py:193–208";
+        style="dashed";
+        color="#888888";
+        bgcolor="#fce4ec";
+        fontsize=12;
+
+        hook_fidelity [label="hooks-fidelity-reporter\n(modules/hooks-fidelity-reporter)\nRegisters: tool:post, prompt:complete\nPriority: 50", fillcolor="#E91E63", fontcolor="white"];
+        hook_crew_gate [label="hooks-crew-gate\n(modules/hooks-crew-gate)\nRegisters: prompt:complete, tool:post\nPriority: 10", fillcolor="#E91E63", fontcolor="white"];
+        hook_mode [label="hooks-mode\n(amplifier-bundle-modes, external)\nRegisters: prompt:complete (?)\nPriority: unknown", fillcolor="#880E4F", fontcolor="white"];
+        tool_fidelity_state [label="tool-fidelity-state\n(modules/tool-fidelity-state)\nMounts: update_fidelity tool\nRegisters: zerovector.fidelity_state capability", fillcolor="#C2185B", fontcolor="white"];
+        tool_mode [label="tool-mode\n(amplifier-bundle-modes, external)\nMounts: mode tool (set/clear/list)", fillcolor="#880E4F", fontcolor="white"];
+
+        hook_registry [label="HookRegistry\n(coordinator.hooks)\nhooks.py:32–284", fillcolor="#9C27B0", fontcolor="white"];
+
+        hook_fidelity -> hook_registry [label="register()"];
+        hook_crew_gate -> hook_registry [label="register()"];
+        hook_mode -> hook_registry [label="register()"];
+    }
+
+    crew_behavior -> hook_fidelity [label="hooks declaration\n(zerovector-crew.yaml:15-16)", style=dashed];
+    crew_behavior -> hook_mode [label="hooks declaration\n(zerovector-crew.yaml:13-14)", style=dashed];
+    crew_behavior -> tool_fidelity_state [label="tools declaration\n(zerovector-crew.yaml:23-24)", style=dashed];
+    crew_behavior -> tool_mode [label="tools declaration\n(zerovector-crew.yaml:19-22)", style=dashed];
+    fidelity_behavior -> hook_fidelity [label="hooks declaration\n(fidelity.yaml:26-27)", style=dashed];
+    fidelity_behavior -> tool_fidelity_state [label="tools declaration\n(fidelity.yaml:30-31)", style=dashed];
+
+    // =====================================================================
+    // LAYER 5: Per-turn dynamic injection (hook events)
+    // =====================================================================
+    subgraph cluster_dynamic {
+        label="Per-Turn Dynamic Injection (every LLM turn)";
+        style="dashed";
+        color="#888888";
+        bgcolor="#e3f2fd";
+        fontsize=12;
+
+        event_prompt_complete [label="prompt:complete event\n(events.py:13)", fillcolor="#1565C0", fontcolor="white", shape=diamond];
+        event_tool_post [label="tool:post event\n(events.py:31)", fillcolor="#1565C0", fontcolor="white", shape=diamond];
+
+        fidelity_state_cap [label="zerovector.fidelity_state\ncapability\n(coordinator._capabilities)", fillcolor="#0277BD", fontcolor="white"];
+
+        update_fidelity_call [label="LLM calls update_fidelity()\n{lens_scores: {...}}\n(tool-fidelity-state:141-159)", fillcolor="#0288D1", fontcolor="white"];
+
+        hook_result_fidelity [label="HookResult(\n  action='continue',\n  context_injection=ephemeral_text,\n  ephemeral=True,\n  user_message=ansi_dashboard\n)\n(hooks-fidelity-reporter:310–317)", fillcolor="#01579B", fontcolor="white", shape=note];
+
+        hook_result_crew_gate [label="HookResult(\n  action='continue',\n  context_injection=SOFT_REMINDER,\n  ephemeral=True\n)\n(hooks-crew-gate:181–188)\n[ONLY when no mode active]", fillcolor="#880E4F", fontcolor="white", shape=note];
+
+        hook_result_mode [label="HookResult(\n  context_injection=mode_body,\n  ephemeral=True (?)\n)\n(hooks-mode, inferred)\n[ONLY when mode is active]", fillcolor="#880E4F", fontcolor="white", shape=note];
+
+        coordinator_process [label="coordinator.process_hook_result()\n(coordinator.py:342–376)\nEphemeral → NOT stored\nNon-ephemeral → context.add_message()", fillcolor="#263238", fontcolor="white"];
+
+        ephemeral_to_llm [label="Orchestrator appends ephemeral\ninjection to CURRENT LLM call\n(not stored in history)", fillcolor="#004D40", fontcolor="white", shape=note];
+    }
+
+    // Dynamic injection flow
+    hook_registry -> event_prompt_complete [label="emit() (hooks.py:111)", style=bold];
+    hook_registry -> event_tool_post [label="emit() (hooks.py:111)", style=bold];
+
+    update_fidelity_call -> fidelity_state_cap [label="updates FidelityState\nlens_scores populated"];
+    event_tool_post -> update_fidelity_call [label="triggers after\nupdate_fidelity completes"];
+
+    event_prompt_complete -> hook_fidelity [label="fires handler\n(priority 50)"];
+    event_tool_post -> hook_fidelity [label="fires handler\n(priority 50)"];
+    hook_fidelity -> fidelity_state_cap [label="get_capability()\n'zerovector.fidelity_state'"];
+    fidelity_state_cap -> hook_result_fidelity [label="state has lens_scores\n→ render_ephemeral()"];
+
+    event_prompt_complete -> hook_crew_gate [label="fires handler\n(priority 10)"];
+    hook_crew_gate -> hook_result_crew_gate [label="no mode active"];
+
+    event_prompt_complete -> hook_mode [label="fires handler"];
+    hook_mode -> hook_result_mode [label="mode is active"];
+
+    hook_result_fidelity -> coordinator_process;
+    hook_result_crew_gate -> coordinator_process;
+    hook_result_mode -> coordinator_process;
+
+    coordinator_process -> ephemeral_to_llm [label="ephemeral=True\nbypasses context store\n(coordinator.py:411-413)"];
+
+    // =====================================================================
+    // LAYER 6: LLM receives
+    // =====================================================================
+    subgraph cluster_llm {
+        label="What the LLM Receives";
+        style="dashed";
+        color="#888888";
+        bgcolor="#fff9c4";
+        fontsize=12;
+
+        llm_system [label="SYSTEM PROMPT (always present):\n• bundle.md STANDING-ORDER\n• <context_file> zerovector-principles.md\n• <context_file> crew-instructions.md\n• <context_file> domain-tuning.md\n• <context_file> fidelity-framework.md ★\n• <context_file> using-zerovector.md\n• <context_file> modes-instructions.md\n• <context_file> common-system-base.md", fillcolor="#F9A825", fontcolor="#333"];
+
+        llm_ephemeral_mode [label="EPHEMERAL (per-turn, mode active):\n• crew-build.md body injected by hooks-mode\n  OR nothing if no mode", fillcolor="#FBC02D", fontcolor="#333", shape=note];
+
+        llm_ephemeral_fidelity [label="EPHEMERAL (per-turn, after update_fidelity):\n[FIDELITY STATE — ephemeral, auto-updates]\nStatus: NEEDS_WORK\nOverall: 0.53 | Target: 0.85 (domain: build)\nPriority gap: implementation (0.40)\nRecommendation: Route to builder...", fillcolor="#FBC02D", fontcolor="#333", shape=note];
+
+        llm_ephemeral_gate [label="EPHEMERAL (per-turn, no mode active):\n[CREW GATE — no mode active]\nYou MUST suggest a /crew-* mode...", fillcolor="#FF8F00", fontcolor="white", shape=note];
+    }
+
+    system_msg -> llm_system [label="context_manager.add_message()\nsession init (once)", penwidth=2];
+    ephemeral_to_llm -> llm_ephemeral_mode [label="if mode active"];
+    ephemeral_to_llm -> llm_ephemeral_fidelity [label="if lens_scores populated"];
+    ephemeral_to_llm -> llm_ephemeral_gate [label="if no mode active"];
+
+    // =====================================================================
+    // KEY GATE: What determines fidelity instructions in prompt
+    // =====================================================================
+    subgraph cluster_gate {
+        label="Gate: What determines fidelity instructions in LLM prompt?";
+        style="filled";
+        fillcolor="#ffebee";
+        color="#c62828";
+        fontsize=12;
+
+        gate1 [label="GATE 1: Is fidelity-framework.md loaded?\n→ ALWAYS YES (from fidelity.yaml context.include)\nCondition: fidelity behavior included in bundle composition", fillcolor="#EF9A9A", fontcolor="#333"];
+        gate2 [label="GATE 2: Does ephemeral routing advice appear?\n→ ONLY IF update_fidelity was called\n(lens_scores must be non-empty in FidelityState)\nCondition: critic has been delegated + called update_fidelity", fillcolor="#EF9A9A", fontcolor="#333"];
+        gate3 [label="GATE 3: Does crew-build mode body appear?\n→ ONLY IF /crew-build mode is active\n(tool-mode set + hooks-mode injecting)\nCondition: user activated /crew-build", fillcolor="#EF9A9A", fontcolor="#333"];
+    }
+
+    ctx_fidelity -> gate1;
+    fidelity_state_cap -> gate2;
+    hook_mode -> gate3;
+}

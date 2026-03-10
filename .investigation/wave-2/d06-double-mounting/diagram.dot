@@ -1,0 +1,82 @@
+digraph D06_DoubleMounting {
+    rankdir=TB;
+    fontname="Helvetica";
+    node [fontname="Helvetica", fontsize=11];
+    edge [fontname="Helvetica", fontsize=10];
+
+    // =========================================================
+    // YAML Source Layer
+    // =========================================================
+    subgraph cluster_yaml {
+        label="YAML Declarations";
+        style=filled; fillcolor="#f0f4ff";
+
+        ZVC [label="zerovector-crew.yaml\n─────────────────\nincludes: zerovector:behaviors/fidelity  ← line 10\nhooks: hooks-fidelity-reporter           ← line 15\ntools: tool-fidelity-state               ← line 23", shape=box, style=filled, fillcolor="#d0e0ff"];
+
+        FID [label="fidelity.yaml\n─────────────────\nhooks: hooks-fidelity-reporter           ← line 11\ntools: tool-fidelity-state               ← line 15", shape=box, style=filled, fillcolor="#d0e0ff"];
+
+        ZVC -> FID [label="includes:", style=dashed];
+    }
+
+    // =========================================================
+    // Bundle Composition Layer (amplifier-foundation)
+    // =========================================================
+    subgraph cluster_foundation {
+        label="amplifier-foundation: Bundle Composition";
+        style=filled; fillcolor="#f0fff0";
+
+        LOAD_SINGLE [label="BundleRegistry._load_single()\nregistry.py:217–289\n─────────────────\nDetects includes, triggers\n_compose_includes()", shape=box, style=filled, fillcolor="#c0f0c0"];
+
+        COMPOSE_INC [label="_compose_includes()\nregistry.py:337–372\n─────────────────\n1. Load fidelity as Bundle\n2. result = fidelity_bundle  (parent)\n3. return result.compose(zerovector_crew)  (child)\n\n→ zerovector-crew overrides fidelity on conflicts", shape=box, style=filled, fillcolor="#c0f0c0"];
+
+        BUNDLE_COMPOSE [label="Bundle.compose()\nbundle.py:61–146\n─────────────────\nresult.tools = merge_module_lists(result.tools, other.tools)\nresult.hooks = merge_module_lists(result.hooks, other.hooks)\n\n→ Calls deduplication function", shape=box, style=filled, fillcolor="#90e090"];
+
+        MERGE_MOD [label="merge_module_lists(parent, child)\nmerge.py:37–74\n─────────────────\n1. Index parent by module: key  → by_id dict\n2. For child: if module_id in by_id:\n       by_id[id] = deep_merge(existing, child)  ← child wins\n   else: by_id[id] = child\n3. return list(by_id.values())  ← ONE entry per module ID\n\n✓ tool-fidelity-state: 1 entry (child/direct wins)\n✓ hooks-fidelity-reporter: 1 entry (child/direct wins)", shape=box, style=filled, fillcolor="#60d060"];
+
+        MOUNT_PLAN [label="Bundle.to_mount_plan()\nbundle.py:148–172\n─────────────────\nmount_plan[\"tools\"] = list(self.tools)  ← 1 entry\nmount_plan[\"hooks\"] = list(self.hooks)  ← 1 entry", shape=box, style=filled, fillcolor="#c0f0c0"];
+    }
+
+    // =========================================================
+    // Session Initialization Layer (amplifier-core)
+    // =========================================================
+    subgraph cluster_core {
+        label="amplifier-core: Session Init (NO deduplication here)";
+        style=filled; fillcolor="#fff8f0";
+
+        SESSION_INIT [label="AmplifierSession.initialize()\nsession.py:95–222\n─────────────────\nfor tool_config in self.config.get(\"tools\", []):\n    tool_mount = await self.loader.load(module_id, ...)\n    cleanup = await tool_mount(self.coordinator)\n\n→ No dedup check — trusts mount plan is clean", shape=box, style=filled, fillcolor="#ffe0c0"];
+
+        LOADER [label="ModuleLoader.load()\nloader.py:150–230\n─────────────────\nif module_id in self._loaded_modules:\n    return self._loaded_modules[module_id]  ← cached fn\n\n→ Secondary cache by module_id\n→ DOES NOT prevent double-mounting\n   (same fn called twice = 2 instances)", shape=box, style=filled, fillcolor="#ffe0c0"];
+
+        COORD_MOUNT [label="coordinator.mount(\"tools\", module)\ncoordinator.py:147–176\n─────────────────\nself.mount_points[\"tools\"][name] = module  ← dict assign\n\n⚠ No duplicate warning for tools mount point\n  (warning only for orchestrator/context)", shape=box, style=filled, fillcolor="#ffc080"];
+
+        HOOK_REG [label="HookRegistry.register()\nhooks.py:64–96\n─────────────────\nself._handlers[event].append(hook_handler)\n\n⚠ APPENDS — does NOT deduplicate\n  Duplicate registrations fire TWICE per event", shape=box, style=filled, fillcolor="#ffc080"];
+    }
+
+    // =========================================================
+    // Verdict
+    // =========================================================
+    subgraph cluster_verdict {
+        label="D-06 Verdict";
+        style=filled; fillcolor="#e8e8e8";
+
+        VERDICT [label="✓ NO DOUBLE-MOUNTING\n─────────────────\nmerge_module_lists() deduplicates at compose time.\nMount plan has exactly ONE entry per module ID.\nSession loads each module exactly once.", shape=box, style=filled, fillcolor="#90ff90", fontsize=12];
+    }
+
+    // =========================================================
+    // Edges
+    // =========================================================
+    ZVC -> LOAD_SINGLE [label="loaded as Bundle"];
+    FID -> LOAD_SINGLE [label="loaded via include"];
+    LOAD_SINGLE -> COMPOSE_INC;
+    COMPOSE_INC -> BUNDLE_COMPOSE [label="result.compose(bundle)"];
+    BUNDLE_COMPOSE -> MERGE_MOD [label="tools & hooks"];
+    MERGE_MOD -> MOUNT_PLAN [label="deduplicated lists"];
+    MOUNT_PLAN -> SESSION_INIT [label="config dict"];
+    SESSION_INIT -> LOADER [label="per tool_config entry"];
+    LOADER -> COORD_MOUNT [label="tool_mount(coordinator)"];
+    SESSION_INIT -> HOOK_REG [label="per hook_config entry\n(via hook module's mount fn)"];
+    MERGE_MOD -> VERDICT [label="dedup happens HERE", style=bold, color=green];
+
+    // Theoretical double-mount path (dashed = doesn't happen)
+    MERGE_MOD -> SESSION_INIT [label="IF duplicates survived\n(doesn't happen in practice)", style=dashed, color=red];
+}

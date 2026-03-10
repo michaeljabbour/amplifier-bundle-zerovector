@@ -1,0 +1,188 @@
+// Integration Architecture: Todo vs Fidelity
+// Shows cross-boundary data flow and integration depth
+digraph todo_vs_fidelity {
+    rankdir=TB;
+    fontname="Helvetica";
+    node [fontname="Helvetica", fontsize=10];
+    edge [fontname="Helvetica", fontsize=8];
+    compound=true;
+    newrank=true;
+
+    // =====================================================================
+    // LAYER 1: LLM / Provider
+    // =====================================================================
+    subgraph cluster_llm {
+        label="LLM Provider";
+        style=filled;
+        fillcolor="#f0f0f0";
+        color="#999999";
+        LLM [label="LLM API Call", shape=ellipse, style=filled, fillcolor="#e8e8e8"];
+    }
+
+    // =====================================================================
+    // LAYER 2: Kernel (amplifier-core)
+    // =====================================================================
+    subgraph cluster_kernel {
+        label="Kernel (amplifier-core)";
+        style=filled;
+        fillcolor="#e6f3ff";
+        color="#4a90d9";
+
+        subgraph cluster_coordinator {
+            label="ModuleCoordinator";
+            style=dashed;
+            color="#4a90d9";
+
+            tools_mount [label="tools mount point\n(dict[str, Tool])", shape=box3d, style=filled, fillcolor="#cce0ff"];
+            hooks_registry [label="HookRegistry\n(event → handlers[])", shape=box3d, style=filled, fillcolor="#cce0ff"];
+            capabilities [label="Capability Registry\n(name → value)", shape=box3d, style=filled, fillcolor="#cce0ff"];
+        }
+
+        subgraph cluster_events {
+            label="Lifecycle Events";
+            style=dashed;
+            color="#4a90d9";
+
+            provider_request [label="provider:request\n(before LLM call)", shape=diamond, style=filled, fillcolor="#ffffcc"];
+            tool_post [label="tool:post\n(after tool exec)", shape=diamond, style=filled, fillcolor="#ffffcc"];
+            prompt_complete [label="prompt:complete\n(after assistant turn)", shape=diamond, style=filled, fillcolor="#ffffcc"];
+        }
+    }
+
+    // =====================================================================
+    // LAYER 3A: Foundation Bundle (Todo)
+    // =====================================================================
+    subgraph cluster_foundation {
+        label="Foundation Bundle (always loaded)";
+        style=filled;
+        fillcolor="#e6ffe6";
+        color="#2d8f2d";
+
+        subgraph cluster_todo_behavior {
+            label="behavior: todo-reminder";
+            style=dashed;
+            color="#2d8f2d";
+
+            tool_todo [label="tool-todo\n(git module)\nState: _todos list", shape=component, style=filled, fillcolor="#b3e6b3"];
+            hooks_todo_reminder [label="hooks-todo-reminder\n(git module)\nFires: provider:request\nPriority: 10", shape=component, style=filled, fillcolor="#b3e6b3"];
+        }
+    }
+
+    // =====================================================================
+    // LAYER 3B: ZeroVector Bundle (Fidelity)
+    // =====================================================================
+    subgraph cluster_zerovector {
+        label="ZeroVector Bundle (conditionally composed)";
+        style=filled;
+        fillcolor="#fff0e6";
+        color="#d9822b";
+
+        subgraph cluster_crew_behavior {
+            label="behavior: zerovector-crew";
+            style=dashed;
+            color="#d9822b";
+
+            subgraph cluster_fidelity_behavior {
+                label="behavior: fidelity\n(transitive include\nBUG: hooks not merged)";
+                style=dashed;
+                color="#cc0000";
+                fontcolor="#cc0000";
+
+                tool_fidelity [label="tool-fidelity-state\n(local module)\nState: FidelityState", shape=component, style=filled, fillcolor="#ffd9b3"];
+                hooks_fidelity [label="hooks-fidelity-reporter\n(local module)\nFires: tool:post, prompt:complete\nPriority: 50", shape=component, style=filled, fillcolor="#ffd9b3"];
+            }
+
+            // Redundant declarations (workaround for bug)
+            tool_fidelity_dup [label="tool-fidelity-state\n(REDUNDANT decl)\nCommit 6a0999e", shape=component, style=filled, fillcolor="#ffcccc"];
+            hooks_fidelity_dup [label="hooks-fidelity-reporter\n(REDUNDANT decl)\nCommit 6a0999e", shape=component, style=filled, fillcolor="#ffcccc"];
+        }
+    }
+
+    // =====================================================================
+    // LAYER 4: Kepler Distro (Sidecar)
+    // =====================================================================
+    subgraph cluster_kepler {
+        label="Kepler Distro Sidecar";
+        style=filled;
+        fillcolor="#f5e6ff";
+        color="#8b4dbd";
+
+        todo_rest [label="REST API\n/todos CRUD\n(329 LOC)", shape=box, style=filled, fillcolor="#e0ccff"];
+        todo_ws [label="WebSocket\ntodo_update events\nwith child nesting", shape=box, style=filled, fillcolor="#e0ccff"];
+        todo_persist [label="Disk Persistence\n~/.kepler/todos/\ntodo_meta.json", shape=cylinder, style=filled, fillcolor="#e0ccff"];
+        stream_translator [label="StreamEventTranslator\nchild todo merging\nparentTaskId tracking", shape=box, style=filled, fillcolor="#e0ccff"];
+
+        fidelity_void [label="(nothing)\nNo REST API\nNo WebSocket\nNo persistence", shape=plaintext, fontcolor="#cc0000"];
+    }
+
+    // =====================================================================
+    // LAYER 5: Frontend
+    // =====================================================================
+    subgraph cluster_frontend {
+        label="Kepler Frontend";
+        style=filled;
+        fillcolor="#fff5e6";
+        color="#b38600";
+
+        todo_store [label="todo-store.ts\nSvelte store\n5 test files", shape=box, style=filled, fillcolor="#ffe6b3"];
+        fidelity_frontend [label="(nothing)\nNo store\nNo UI", shape=plaintext, fontcolor="#cc0000"];
+    }
+
+    // =====================================================================
+    // EDGES: Todo Data Flow (green)
+    // =====================================================================
+
+    // Tool registration
+    tool_todo -> tools_mount [label="mount('tools', tool)", color="#2d8f2d", style=bold];
+
+    // State flow: tool → reminder hook
+    tool_todo -> hooks_todo_reminder [label="coordinator.todo_state\n(capability)", color="#2d8f2d", style=dashed];
+
+    // Hook fires on provider:request
+    hooks_todo_reminder -> provider_request [label="registers handler", color="#2d8f2d"];
+
+    // Injection into LLM
+    provider_request -> LLM [label="ephemeral injection\nrole=user\nappend_to_last_tool_result", color="#2d8f2d", style=bold];
+
+    // Distro integration
+    tool_todo -> todo_rest [label="getattr(tool, '_todos')\ndirect attribute access", color="#8b4dbd", style=bold];
+    tool_todo -> stream_translator [label="tool:post event\ntodo tool detected", color="#8b4dbd"];
+    stream_translator -> todo_ws [label="todo_update msg", color="#8b4dbd"];
+    stream_translator -> todo_persist [label="_save_todos_for_conversation", color="#8b4dbd"];
+    todo_ws -> todo_store [label="WebSocket message", color="#b38600"];
+
+    // =====================================================================
+    // EDGES: Fidelity Data Flow (orange)
+    // =====================================================================
+
+    // Tool registration
+    tool_fidelity -> tools_mount [label="mount('tools', tool)", color="#d9822b", style=bold];
+    tool_fidelity -> capabilities [label="register_capability\n('zerovector.fidelity_state')", color="#d9822b"];
+
+    // State flow: tool → reporter hook
+    capabilities -> hooks_fidelity [label="get_capability\n('zerovector.fidelity_state')", color="#d9822b", style=dashed];
+
+    // Hook fires on tool:post and prompt:complete
+    hooks_fidelity -> tool_post [label="registers handler", color="#d9822b"];
+    hooks_fidelity -> prompt_complete [label="registers handler", color="#d9822b"];
+
+    // Injection timing gap
+    tool_post -> LLM [label="ephemeral injection\nrole=system\n(TIMING GAP:\nmust survive to\nnext provider:request)", color="#cc0000", style=dashed];
+
+    // Redundant declaration edges
+    tool_fidelity_dup -> tool_fidelity [label="same module\nduplicated as\nworkaround", color="#cc0000", style=dotted];
+    hooks_fidelity_dup -> hooks_fidelity [label="same module\nduplicated as\nworkaround", color="#cc0000", style=dotted];
+
+    // No distro integration
+    tool_fidelity -> fidelity_void [label="NO integration", color="#cc0000", style=dotted];
+    fidelity_void -> fidelity_frontend [label="NO integration", color="#cc0000", style=dotted];
+
+    // =====================================================================
+    // RANK HINTS
+    // =====================================================================
+    {rank=same; LLM}
+    {rank=same; provider_request; tool_post; prompt_complete}
+    {rank=same; tool_todo; tool_fidelity}
+    {rank=same; todo_rest; todo_ws; fidelity_void}
+    {rank=same; todo_store; fidelity_frontend}
+}
