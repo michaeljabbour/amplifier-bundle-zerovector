@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "amplifier-module-hooks-crew-gate"
+version = "0.3.0"
+description = "Crew gate hook — blocks artifact creation without an active crew mode"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.entry-points."amplifier.modules"]
+hooks-crew-gate = "amplifier_module_hooks_crew_gate:mount"
+
+[tool.hatch.build.targets.wheel]
+packages = ["amplifier_module_hooks_crew_gate"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
