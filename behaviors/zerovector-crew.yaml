@@ -12,10 +12,14 @@ includes:
 hooks:
   - module: hooks-crew-gate
     source: git+https://github.com/michaeljabbour/amplifier-bundle-zerovector@main#subdirectory=modules/hooks-crew-gate
+  - module: hooks-fidelity-reporter
+    source: git+https://github.com/michaeljabbour/amplifier-bundle-zerovector@main#subdirectory=modules/hooks-fidelity-reporter
   - module: hooks-mode
     source: git+https://github.com/microsoft/amplifier-bundle-modes@main#subdirectory=modules/hooks-mode
 
 tools:
+  - module: tool-fidelity-state
+    source: git+https://github.com/michaeljabbour/amplifier-bundle-zerovector@main#subdirectory=modules/tool-fidelity-state
   - module: tool-mode
     source: git+https://github.com/microsoft/amplifier-bundle-modes@main#subdirectory=modules/tool-mode
     config:
