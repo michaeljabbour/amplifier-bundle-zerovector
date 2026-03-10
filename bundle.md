@@ -6,7 +6,7 @@ bundle:
 
 includes:
   - bundle: git+https://github.com/microsoft/amplifier-foundation@main
-  - bundle: zerovector:behaviors/zerovector-crew
+  - bundle: git+https://github.com/michaeljabbour/amplifier-bundle-zerovector@main#subdirectory=behaviors/zerovector-crew.yaml
 ---
 
 # Zero-Vector Design
