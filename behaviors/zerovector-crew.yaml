@@ -10,18 +10,16 @@ includes:
   - bundle: zerovector:behaviors/fidelity
 
 hooks:
+  - module: hooks-crew-gate
+    source: ../modules/hooks-crew-gate
   - module: hooks-mode
     source: git+https://github.com/microsoft/amplifier-bundle-modes@main#subdirectory=modules/hooks-mode
-  - module: hooks-fidelity-reporter
-    source: ../modules/hooks-fidelity-reporter
 
 tools:
   - module: tool-mode
     source: git+https://github.com/microsoft/amplifier-bundle-modes@main#subdirectory=modules/tool-mode
     config:
       gate_policy: "warn"
-  - module: tool-fidelity-state
-    source: ../modules/tool-fidelity-state
   - module: tool-skills
     source: git+https://github.com/microsoft/amplifier-module-tool-skills@main
     config:

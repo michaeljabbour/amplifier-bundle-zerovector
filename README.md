@@ -139,6 +139,26 @@ includes:
 
 This gives you the Critic agent, the fidelity framework context (`context/fidelity-framework.md`), the live dashboard hook, and the fidelity state tool — all without the crew modes or convergence recipes.
 
+## Alignment Monitoring (AMOS)
+
+[AMOS](https://github.com/michaeljabbour/amplifier-bundle-amos) is a recommended companion bundle for real-time per-turn alignment monitoring. While fidelity tracks project-level translation loss across the convergence loop, AMOS measures turn-level quality on every LLM response.
+
+AMOS fires at priority 40 (before the fidelity reporter at 50) and evaluates three dimensions:
+
+- **Prompt-response alignment** — does the response address what was asked?
+- **Context consistency** — does it stay coherent with prior conversation?
+- **Goal alignment** — does it advance the stated objective?
+
+It also tracks cognitive state signals (confusion, frustration, engagement) to detect when the conversation is going off track.
+
+**Measurement layers:** AMOS = per-turn quality, Fidelity = per-project convergence. They complement each other. Both bundles operate independently and can be used separately or together.
+
+To add AMOS alongside ZeroVector:
+
+```bash
+amplifier bundle add git+https://github.com/michaeljabbour/amplifier-bundle-amos@main --app
+```
+
 ## Recipes
 
 All six recipes are available under `zerovector:recipes/`:
@@ -196,6 +216,8 @@ amplifier-bundle-zerovector/
     ├── 04-implementation-decisions.md         # Every structural choice with rationale
     └── 05-roadmap.md                          # Phased roadmap through v1.0.0
 ```
+
+> Optional companion: [amplifier-bundle-amos](https://github.com/michaeljabbour/amplifier-bundle-amos) — per-turn alignment monitoring
 
 ## Smoke Tests
 
