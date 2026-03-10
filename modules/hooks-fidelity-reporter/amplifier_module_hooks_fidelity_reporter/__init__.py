@@ -347,6 +347,11 @@ async def mount(
     unregister_fns: list[Callable[[], None]] = []
 
     async def _on_tool_post(event: str, data: dict[str, Any]) -> HookResult:
+        # Only render when scores just changed — avoids stale re-renders
+        # on every bash/grep/delegate call after first update_fidelity.
+        tool_name = data.get("tool_name") or data.get("name") or data.get("tool") or ""
+        if tool_name != "update_fidelity":
+            return _CONTINUE
         return await reporter.handle_event(event, data, coordinator)
 
     async def _on_prompt_complete(event: str, data: dict[str, Any]) -> HookResult:

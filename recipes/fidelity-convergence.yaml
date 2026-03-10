@@ -123,6 +123,27 @@ steps:
     output: "score_result"
 
   # ==========================================================================
+  # STEP 3b: PERSIST FIDELITY STATE
+  # Calls update_fidelity so the live ANSI dashboard renders initial scores
+  # ==========================================================================
+  - id: "persist-initial-fidelity"
+    agent: "self"
+    prompt: |
+      Call the update_fidelity tool with these EXACT parameters. Do not add or change anything:
+
+      lens_scores:
+        intent_clarity: {{assessment.intent_clarity.score}}
+        specification: {{assessment.specification.score}}
+        implementation: {{assessment.implementation.score}}
+        quality: {{assessment.quality.score}}
+        ship_readiness: {{assessment.ship_readiness.score}}
+      domain: "{{domain}}"
+      target: {{target_fidelity}}
+
+      Call the tool once, then say "Fidelity state persisted."
+    output: "fidelity_persisted"
+
+  # ==========================================================================
   # STEP 4: CONVERGENCE LOOP
   # Routes to the agent serving the weakest fidelity lens, re-assesses, repeats
   # until overall fidelity >= target_fidelity or max_while_iterations is reached
@@ -205,6 +226,26 @@ steps:
           }
         parse_json: true
         output: "assessment"
+
+      # -----------------------------------------------------------------------
+      # Persist updated scores to the live fidelity dashboard
+      # -----------------------------------------------------------------------
+      - id: "persist-loop-fidelity"
+        agent: "self"
+        prompt: |
+          Call the update_fidelity tool with these EXACT parameters. Do not add or change anything:
+
+          lens_scores:
+            intent_clarity: {{assessment.intent_clarity.score}}
+            specification: {{assessment.specification.score}}
+            implementation: {{assessment.implementation.score}}
+            quality: {{assessment.quality.score}}
+            ship_readiness: {{assessment.ship_readiness.score}}
+          domain: "{{domain}}"
+          target: {{target_fidelity}}
+
+          Call the tool once, then say "Fidelity state persisted."
+        output: "loop_fidelity_persisted"
 
   # ==========================================================================
   # STEP 5: CONVERGENCE SUMMARY
