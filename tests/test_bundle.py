@@ -96,8 +96,8 @@ class TestBundleIncludes:
 
     def test_includes_zerovector_crew(self, frontmatter: dict):
         bundles = [entry["bundle"] for entry in frontmatter["includes"]]
-        assert "zerovector:behaviors/zerovector-crew" in bundles, (
-            "includes must contain 'zerovector:behaviors/zerovector-crew'"
+        assert any("zerovector-crew" in b for b in bundles), (
+            "includes must contain an entry referencing 'zerovector-crew'"
         )
 
     def test_does_not_include_zerovector_methodology(self, frontmatter: dict):

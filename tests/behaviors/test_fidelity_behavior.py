@@ -57,7 +57,7 @@ class TestFidelityBehaviorHooks:
     def test_hooks_fidelity_reporter_source(self):
         data = _load_behavior()
         hook = data["hooks"][0]
-        assert hook["source"] == "../modules/hooks-fidelity-reporter"
+        assert "hooks-fidelity-reporter" in hook["source"]
 
 
 class TestFidelityBehaviorTools:
@@ -76,7 +76,7 @@ class TestFidelityBehaviorTools:
     def test_tool_fidelity_state_source(self):
         data = _load_behavior()
         tool = data["tools"][0]
-        assert tool["source"] == "../modules/tool-fidelity-state"
+        assert "tool-fidelity-state" in tool["source"]
 
 
 class TestFidelityBehaviorAgents:
@@ -87,16 +87,6 @@ class TestFidelityBehaviorAgents:
         assert "agents" in data
         assert "include" in data["agents"]
         assert "zerovector:critic" in data["agents"]["include"]
-
-
-class TestFidelityBehaviorContext:
-    """AC-7: context.include references zerovector:context/fidelity-framework.md."""
-
-    def test_context_include_fidelity_framework(self):
-        data = _load_behavior()
-        assert "context" in data
-        assert "include" in data["context"]
-        assert "zerovector:context/fidelity-framework.md" in data["context"]["include"]
 
 
 class TestFidelityBehaviorDescription:

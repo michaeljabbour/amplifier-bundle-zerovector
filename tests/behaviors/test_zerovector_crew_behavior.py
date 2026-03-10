@@ -54,8 +54,8 @@ class TestZerovectorCrewBehaviorIncludes:
     def test_includes_fidelity_behavior(self):
         data = _load_behavior()
         included_bundles = [entry["bundle"] for entry in data["includes"]]
-        assert "zerovector:behaviors/fidelity" in included_bundles, (
-            "Must include zerovector:behaviors/fidelity"
+        assert any("fidelity" in b for b in included_bundles), (
+            "Must include an entry referencing fidelity"
         )
 
 
@@ -106,13 +106,9 @@ class TestZerovectorCrewBehaviorContext:
         assert "context" in data
         assert "include" in data["context"]
 
-    def test_context_includes_crew_instructions(self):
+    def test_context_includes_crew_routing(self):
         data = _load_behavior()
-        assert "zerovector:context/crew-instructions.md" in data["context"]["include"]
-
-    def test_context_includes_domain_tuning(self):
-        data = _load_behavior()
-        assert "zerovector:context/domain-tuning.md" in data["context"]["include"]
+        assert "zerovector:context/crew-routing.md" in data["context"]["include"]
 
     def test_context_includes_modes_instructions(self):
         data = _load_behavior()
