@@ -137,7 +137,7 @@ includes:
   - bundle: zerovector:behaviors/fidelity
 ```
 
-This gives you the Critic agent, the fidelity framework context (`context/fidelity-framework.md`), the live dashboard hook, and the fidelity state tool — all without the crew modes or convergence recipes.
+This gives you the Critic agent, the fidelity framework (loaded on demand via the `fidelity-framework` skill), the live dashboard hook, and the fidelity state tool — all without the crew modes or convergence recipes.
 
 ## Alignment Monitoring (AMOS)
 

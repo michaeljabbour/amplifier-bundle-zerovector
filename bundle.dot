@@ -1,0 +1,99 @@
+digraph zerovector {
+    rankdir=LR
+    fontname="Helvetica"
+    fontsize=12
+    label="zerovector v0.3.0 — bundle repo"
+    labelloc=t
+    labeljust=c
+    nodesep=0.6
+    ranksep=0.7
+    bgcolor="white"
+    source_hash="663a7ea3c80b5eeadc4dc4d6ef3cea9302d280ce135f59e843de923f7337a7c7"
+
+    node [fontname="Helvetica", fontsize=11, style="filled,rounded"]
+    edge [fontname="Helvetica", fontsize=9]
+
+    root_zerovector [label="zerovector v0.3.0\n0 tools · 0 agents\n~845 tok aggregate", shape=box, fillcolor="#80cbc4", style="filled,rounded,bold", penwidth=2]
+
+    subgraph cluster_behaviors {
+        label="Behaviors"
+        style="filled"
+        fillcolor="#f9f9f9"
+        color="#999999"
+
+        beh_fidelity_behavior [label="fidelity-behavior\n2 tools\n~464 tok", shape=box, fillcolor="#e0f2f1", style="filled,rounded"]
+        beh_zerovector_crew [label="zerovector-crew\n6 tools · 3 ctx\n~2694 tok", shape=box, fillcolor="#e0f2f1", style="filled,rounded"]
+    }
+
+    subgraph cluster_agents {
+        label="Agents"
+        style="filled"
+        fillcolor="#f9f9f9"
+        color="#999999"
+
+        agt_architect [label="architect\n~192 tok desc", shape=box, fillcolor="#c8e6c9", style="filled,rounded"]
+        agt_builder [label="builder\n~274 tok desc", shape=box, fillcolor="#c8e6c9", style="filled,rounded"]
+        agt_critic [label="critic\n~294 tok desc", shape=box, fillcolor="#c8e6c9", style="filled,rounded"]
+        agt_intent_analyst [label="intent-analyst\n~216 tok desc", shape=box, fillcolor="#c8e6c9", style="filled,rounded"]
+        agt_shipper [label="shipper\n~304 tok desc", shape=box, fillcolor="#c8e6c9", style="filled,rounded"]
+    }
+
+    subgraph cluster_modules {
+        label="Modules"
+        style="filled"
+        fillcolor="#f9f9f9"
+        color="#999999"
+
+        mod_hooks_crew_gate [label="hooks-crew-gate", shape=box, fillcolor="#bbdefb", style="filled,rounded"]
+        mod_hooks_fidelity_reporter [label="hooks-fidelity-reporter", shape=box, fillcolor="#bbdefb", style="filled,rounded"]
+        mod_tool_fidelity_state [label="tool-fidelity-state", shape=box, fillcolor="#bbdefb", style="filled,rounded"]
+    }
+
+    subgraph cluster_context {
+        label="Context Files"
+        style="filled"
+        fillcolor="#f9f9f9"
+        color="#999999"
+
+        ctx_using_zerovector_md [label="using-zerovector.md\n~476 tok", shape=box, fillcolor="#e1bee7", style="filled,rounded"]
+        ctx_crew_routing_md [label="crew-routing.md\n~829 tok", shape=box, fillcolor="#e1bee7", style="filled,rounded"]
+    }
+
+    subgraph cluster_legend {
+        label="Legend"
+        style="filled"
+        fillcolor="white"
+        color="#cccccc"
+        fontsize=9
+
+        leg_root [label="root bundle", shape=box, fillcolor="#80cbc4", style="filled,rounded,bold", fontsize=9]
+        leg_behavior [label="behavior", shape=box, fillcolor="#e0f2f1", style="filled,rounded", fontsize=9]
+        leg_agent [label="agent", shape=box, fillcolor="#c8e6c9", style="filled,rounded", fontsize=9]
+        leg_module [label="module", shape=box, fillcolor="#bbdefb", style="filled,rounded", fontsize=9]
+        leg_provider [label="provider", shape=box, fillcolor="#e0e0e0", style="filled,rounded", fontsize=9]
+        leg_context [label="context", shape=box, fillcolor="#e1bee7", style="filled,rounded", fontsize=9]
+        leg_standalone [label="standalone", shape=box, fillcolor="#80cbc4", style="filled,rounded", fontsize=9]
+        leg_experiment [label="experiment", shape=box, fillcolor="#e1bee7", style="filled,rounded", fontsize=9]
+        leg_ext_cost [label="ext+cost", shape=box, fillcolor="#80cbc4", style="dashed", color="red", penwidth=2, fontsize=9]
+        leg_ext_muted [label="ext+no-cost", shape=box, fillcolor="#f5f5f5", style="dashed", fontsize=9]
+    }
+
+    disclaimer [label="Token estimates: ~4 chars/token\nSolid border = local (counted)\nDashed + red = external, hidden cost (not counted)\nDashed + muted = external, no cost\nExcludes: sub-session costs, runtime-dynamic", shape=note, fillcolor="#eceff1", style="filled", fontsize=9]
+
+    ext_githttps___github_com_microsoft_amplifier_foundation_main [label="amplifier-foundation\n(external, cost)", shape=box, fillcolor="#80cbc4", style="dashed", color="red", penwidth=2]
+
+    root_zerovector -> ext_githttps___github_com_microsoft_amplifier_foundation_main [style=dashed]
+    root_zerovector -> beh_zerovector_crew [label="composes"]
+    beh_fidelity_behavior -> agt_critic [label="owns"]
+    beh_fidelity_behavior -> mod_tool_fidelity_state [label="uses", penwidth=0.8]
+    beh_fidelity_behavior -> mod_hooks_fidelity_reporter [label="uses", penwidth=0.8]
+    beh_zerovector_crew -> agt_intent_analyst [label="owns"]
+    beh_zerovector_crew -> agt_architect [label="owns"]
+    beh_zerovector_crew -> agt_builder [label="owns"]
+    beh_zerovector_crew -> agt_shipper [label="owns"]
+    beh_zerovector_crew -> mod_tool_fidelity_state [label="uses", penwidth=0.8]
+    beh_zerovector_crew -> mod_hooks_crew_gate [label="uses", penwidth=0.8]
+    beh_zerovector_crew -> mod_hooks_fidelity_reporter [label="uses", penwidth=0.8]
+    beh_zerovector_crew -> ctx_using_zerovector_md [style=dotted, color=purple]
+    beh_zerovector_crew -> ctx_crew_routing_md [style=dotted, color=purple]
+}
